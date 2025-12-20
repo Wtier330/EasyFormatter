@@ -1,0 +1,119 @@
+/* 全局样式 */
+QMainWindow {
+    background-color: #f5f5f7;
+}
+
+QWidget {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    color: #333333;
+}
+
+/* 文本编辑器 */
+QPlainTextEdit {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 8px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 13px;
+    selection-background-color: #0078d4;
+    selection-color: #ffffff;
+}
+
+QPlainTextEdit:focus {
+    border: 1px solid #0078d4;
+}
+
+QPlainTextEdit[readOnly="true"] {
+    background-color: #fafafa;
+    color: #555555;
+}
+
+/* 侧边栏 / 规则 */
+QScrollArea {
+    border: none;
+    background-color: transparent;
+}
+
+QWidget#rulesContainer {
+    background-color: #ffffff;
+    border-right: 1px solid #e0e0e0;
+}
+
+QCheckBox {
+    spacing: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+QCheckBox:hover {
+    background-color: #f0f0f0;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #cccccc;
+    border-radius: 3px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #0078d4;
+    border-color: #0078d4;
+    /* image: url(:/icons/check.png); 使用默认勾选或通过代码绘制 */
+}
+
+/* 分割器 */
+QSplitter::handle {
+    background-color: #e0e0e0;
+    height: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: #0078d4;
+}
+
+/* 工具栏 */
+QToolBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    spacing: 10px;
+    padding: 6px;
+}
+
+QToolButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px;
+}
+
+QToolButton:hover {
+    background-color: #f0f0f0;
+    border: 1px solid #d0d0d0;
+}
+
+QToolButton:pressed {
+    background-color: #e0e0e0;
+}
+
+/* 状态栏 */
+QStatusBar {
+    background-color: #f5f5f7;
+    border-top: 1px solid #e0e0e0;
+    color: #666666;
+}
+
+QStatusBar QLabel {
+    padding: 0 10px;
+}
+
+/* 标题 */
+QLabel#sectionTitle {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: #111111;
+}

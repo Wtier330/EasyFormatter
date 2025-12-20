@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller
+*.manifest
+*.spec
+build/
+dist/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+
+# Virtual Environment
+venv/
+env/
+.env
