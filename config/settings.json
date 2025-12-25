@@ -1,0 +1,7 @@
+{
+  "theme": "light",
+  "defaults": {
+    "enabled_rules": ["strip_per_line", "remove_separators", "normalize_newlines"]
+  }
+}
+

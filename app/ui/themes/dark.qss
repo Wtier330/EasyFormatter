@@ -1,0 +1,9 @@
+QMainWindow { background-color: #1e1e1e; }
+QWidget { color: #e6e6e6; }
+QPlainTextEdit { background-color: #2b2b2b; border: 1px solid #3a3a3a; }
+QWidget#rulesContainer { background-color: #2b2b2b; border-right: 1px solid #3a3a3a; }
+QCheckBox { padding: 6px 10px; }
+QCheckBox:hover { background-color: #333333; }
+QStatusBar { background-color: #222222; border-top: 1px solid #3a3a3a; color: #c0c0c0; }
+QLabel#sectionTitle { color: #ffffff; }
+

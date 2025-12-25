@@ -62,7 +62,6 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background-color: #0078d4;
     border-color: #0078d4;
-    /* image: url(:/icons/check.png); 使用默认勾选或通过代码绘制 */
 }
 
 /* 分割器 */
@@ -117,3 +116,4 @@ QLabel#sectionTitle {
     margin-bottom: 10px;
     color: #111111;
 }
+
