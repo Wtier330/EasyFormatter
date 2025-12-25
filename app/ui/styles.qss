@@ -14,96 +14,81 @@ QWidget {
     color: #333333;
 }
 
-/* ================= Navigation Bar ================= */
-QWidget#navBar {
+/* ================= Toolbar ================= */
+QToolBar {
     background-color: #ffffff;
     border-bottom: 1px solid #e0e0e0;
+    spacing: 6px;
+    padding: 4px;
 }
 
-/* Toggle Sidebar Button */
-QPushButton#navIconBtn {
+QToolButton {
     background-color: transparent;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 4px;
     padding: 6px;
 }
-QPushButton#navIconBtn:hover {
+
+QToolButton:hover {
     background-color: #f0f0f0;
-}
-QPushButton#navIconBtn:checked {
-    background-color: #e5e5e5; /* Active state */
-}
-QPushButton#navIconBtn:pressed {
-    background-color: #dcdcdc;
+    border: 1px solid #e0e0e0;
 }
 
-/* Main Nav Tabs */
-QPushButton#navBtn {
-    background-color: transparent;
-    border: none;
-    border-radius: 4px;
-    color: #666666;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    margin: 4px 2px;
+QToolButton:pressed {
+    background-color: #e5e5e5;
 }
 
-QPushButton#navBtn:hover {
-    background-color: #f0f0f0;
-    color: #333333;
-}
-
-QPushButton#navBtn:checked {
-    background-color: #e5f1fb; /* Light blue background */
+QToolButton:checked {
+    background-color: #e5f1fb;
+    border: 1px solid #cce4f7;
     color: #0078d4;
 }
 
-QPushButton#navBtn:pressed {
-    background-color: #cce4f7;
-    transform: translateY(1px); /* Simple press effect */
+QToolButton::menu-indicator {
+    image: none; /* Hide default arrow, or style it if needed */
 }
 
-QPushButton#navBtn:disabled {
-    color: #cccccc;
-    background-color: transparent;
-}
-
-/* Nav Tool Buttons (Right side) */
-QPushButton#navToolBtn {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    color: #333333;
-    padding: 6px 12px;
-    font-size: 13px;
-    margin-left: 8px;
-}
-
-QPushButton#navToolBtn:hover {
-    background-color: #f8f9fa;
-    border-color: #d0d0d0;
-    /* Subtle shadow on hover */
-    /* qproperty-shadow is not standard CSS, handled by widget usually */
-}
-
-QPushButton#navToolBtn:pressed {
+/* ================= Chips (Preset Buttons) ================= */
+QToolButton[class="chip"] {
     background-color: #f0f0f0;
-    border-color: #c0c0c0;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #555555;
 }
 
-/* ================= Sidebar ================= */
-QWidget#sidebarContainer {
-    background-color: #f8f9fa; /* Slightly darker than editor */
+QToolButton[class="chip"]:hover {
+    background-color: #e5e5e5;
+    color: #333333;
+}
+
+QToolButton[class="chip"]:checked {
+    background-color: #0078d4;
+    color: #ffffff;
+    border-color: #0078d4;
+}
+
+/* ================= Sidebar (DockWidget & Tabs) ================= */
+QDockWidget {
+    titlebar-close-icon: url(close.png);
+    titlebar-normal-icon: url(undock.png);
+}
+
+QDockWidget::title {
+    text-align: left; 
+    background: #f0f0f0;
+    padding-left: 5px;
+    font-weight: bold;
+}
+
+QTabWidget::pane {
+    border: none;
+    background-color: #f8f9fa;
     border-right: 1px solid #e0e0e0;
 }
 
-QTabWidget#sidebarTabs::pane {
-    border: none;
-    background-color: transparent;
-}
-
-QTabWidget#sidebarTabs::tab-bar {
+QTabWidget::tab-bar {
     alignment: left;
 }
 
@@ -128,68 +113,24 @@ QTabBar::tab:selected {
     font-weight: bold;
 }
 
-QLabel#sectionTitle {
-    font-size: 13px;
-    font-weight: bold;
-    color: #777777;
-    text-transform: uppercase;
-    margin: 16px 0 8px 0;
-    padding-left: 4px;
+/* ================= Search Bar ================= */
+QLineEdit {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 6px;
+    background-color: #ffffff;
+    margin: 8px;
+}
+QLineEdit:focus {
+    border: 1px solid #0078d4;
 }
 
-/* Sidebar Action Buttons */
-QWidget#sidebarContainer QPushButton {
-    background-color: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 10px 12px;
-    color: #444444;
-    text-align: left;
-    margin-bottom: 4px;
-    font-size: 14px;
-}
-
-QWidget#sidebarContainer QPushButton:hover {
-    background-color: #f3f3f3;
-    color: #000000;
-}
-
-QWidget#sidebarContainer QPushButton:pressed {
-    background-color: #ebebeb;
-    padding-left: 14px; /* Indent effect */
-}
-
-/* ================= Editors ================= */
+/* ================= Editors & Splitters ================= */
 QSplitter::handle {
     background-color: #e0e0e0;
 }
 QSplitter::handle:hover {
     background-color: #0078d4;
-}
-
-QWidget#editorHeader {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-QWidget#editorHeader QLabel {
-    font-weight: 600;
-    color: #555555;
-}
-
-QPushButton#headerBtn {
-    background-color: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    padding: 4px 8px;
-    color: #666666;
-}
-QPushButton#headerBtn:hover {
-    background-color: #e9ecef;
-    color: #333333;
-}
-QPushButton#headerBtn:pressed {
-    background-color: #dee2e6;
 }
 
 QPlainTextEdit {
@@ -204,15 +145,22 @@ QPlainTextEdit {
 
 QPlainTextEdit[readOnly="true"] {
     background-color: #fafafa;
+    color: #666666; /* Gray text for readonly */
 }
 
-/* ================= Settings ================= */
+/* ================= Settings / Rules ================= */
+QScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
 QGroupBox {
     font-weight: bold;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     margin-top: 10px;
     padding-top: 20px;
+    background-color: #ffffff;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
@@ -230,8 +178,12 @@ QCheckBox:hover {
     background-color: #f0f0f0;
 }
 
+/* ================= Status Bar ================= */
 QStatusBar {
-    background-color: #f3f3f3;
+    background-color: #ffffff;
     color: #666666;
     border-top: 1px solid #e0e0e0;
+}
+QStatusBar::item {
+    border: none;
 }
