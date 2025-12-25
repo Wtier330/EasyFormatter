@@ -1,9 +1,242 @@
-QMainWindow { background-color: #1e1e1e; }
-QWidget { color: #e6e6e6; }
-QPlainTextEdit { background-color: #2b2b2b; border: 1px solid #3a3a3a; }
-QWidget#rulesContainer { background-color: #2b2b2b; border-right: 1px solid #3a3a3a; }
-QCheckBox { padding: 6px 10px; }
-QCheckBox:hover { background-color: #333333; }
-QStatusBar { background-color: #222222; border-top: 1px solid #3a3a3a; color: #c0c0c0; }
-QLabel#sectionTitle { color: #ffffff; }
+/* 
+ * EasyFormatter Modern UI Theme (Dark)
+ * Design System: VS Code Dark+ Inspired
+ */
 
+/* ================= Global ================= */
+QMainWindow {
+    background-color: #1e1e1e;
+}
+
+QWidget {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    color: #cccccc;
+}
+
+/* ================= Navigation Bar ================= */
+QWidget#navBar {
+    background-color: #252526;
+    border-bottom: 1px solid #2d2d2d; /* Subtle border */
+}
+
+/* Toggle Sidebar Button */
+QPushButton#navIconBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+    color: #cccccc;
+}
+QPushButton#navIconBtn:hover {
+    background-color: #3e3e42;
+}
+QPushButton#navIconBtn:checked {
+    background-color: #37373d; 
+    color: #ffffff;
+}
+QPushButton#navIconBtn:pressed {
+    background-color: #0e639c;
+}
+
+/* Main Nav Tabs */
+QPushButton#navBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #969696;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 4px 2px;
+}
+
+QPushButton#navBtn:hover {
+    background-color: #2a2d2e;
+    color: #ffffff;
+}
+
+QPushButton#navBtn:checked {
+    background-color: #37373d;
+    color: #ffffff;
+    border-bottom: 2px solid #0078d4; /* Add bottom border for visibility */
+}
+
+QPushButton#navBtn:pressed {
+    background-color: #0e639c;
+}
+
+QPushButton#navBtn:disabled {
+    color: #555555;
+    background-color: transparent;
+}
+
+/* Nav Tool Buttons (Right side) */
+QPushButton#navToolBtn {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    color: #cccccc;
+    padding: 6px 12px;
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+QPushButton#navToolBtn:hover {
+    background-color: #3e3e42;
+    border-color: #555555;
+}
+
+QPushButton#navToolBtn:pressed {
+    background-color: #0e639c;
+    border-color: #0e639c;
+    color: #ffffff;
+}
+
+/* ================= Sidebar ================= */
+QWidget#sidebarContainer {
+    background-color: #252526;
+    border-right: 1px solid #252526; /* Blend with background */
+}
+
+QLabel#sectionTitle {
+    font-size: 13px;
+    font-weight: bold;
+    color: #bbbbbb;
+    text-transform: uppercase;
+    margin: 16px 0 8px 0;
+    padding-left: 4px;
+}
+
+/* Sidebar Action Buttons */
+QWidget#sidebarContainer QPushButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #cccccc;
+    text-align: left;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+QWidget#sidebarContainer QPushButton:hover {
+    background-color: #2a2d2e;
+    color: #ffffff;
+}
+
+QWidget#sidebarContainer QPushButton:pressed {
+    background-color: #37373d;
+    padding-left: 14px;
+}
+
+/* ================= Editors ================= */
+QSplitter::handle {
+    background-color: #1e1e1e;
+}
+QSplitter::handle:hover {
+    background-color: #0078d4;
+}
+
+QWidget#editorHeader {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #1e1e1e;
+}
+
+QWidget#editorHeader QLabel {
+    font-weight: 600;
+    color: #cccccc;
+}
+
+QPushButton#headerBtn {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #aaaaaa;
+}
+QPushButton#headerBtn:hover {
+    background-color: #3e3e42;
+    color: #ffffff;
+}
+QPushButton#headerBtn:pressed {
+    background-color: #0e639c;
+}
+
+QPlainTextEdit {
+    background-color: #1e1e1e;
+    border: none;
+    padding: 12px;
+    font-family: "Consolas", "Cascadia Code", "Menlo", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d4d4d4;
+    selection-background-color: #264f78;
+    selection-color: #ffffff;
+}
+
+QPlainTextEdit[readOnly="true"] {
+    background-color: #1e1e1e; /* Consistent dark background */
+    color: #aaaaaa;
+}
+
+/* ================= Settings ================= */
+QGroupBox {
+    font-weight: bold;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding-top: 20px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px;
+    color: #aaaaaa;
+}
+
+QCheckBox {
+    spacing: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    color: #cccccc;
+}
+QCheckBox:hover {
+    background-color: #2a2d2e;
+}
+QCheckBox::indicator {
+    background-color: #3c3c3c;
+    border: 1px solid #3c3c3c;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+}
+QCheckBox::indicator:checked {
+    background-color: #0078d4;
+    border: 1px solid #0078d4;
+}
+
+QComboBox {
+    background-color: #3c3c3c;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #cccccc;
+}
+QComboBox:hover {
+    border: 1px solid #555555;
+}
+QComboBox::drop-down {
+    border: none;
+}
+
+QStatusBar {
+    background-color: #0078d4; /* Blue status bar for dark mode or just dark? VS Code uses blue or purple */
+    color: #ffffff;
+    border-top: none;
+}
+/* Let's stick to standard dark status bar */
+QStatusBar {
+    background-color: #007acc;
+    color: #ffffff;
+}

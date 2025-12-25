@@ -1,6 +1,11 @@
-/* 全局样式 */
+/* 
+ * EasyFormatter Modern UI Theme (Light)
+ * Design System: Fluent / Modern
+ */
+
+/* ================= Global ================= */
 QMainWindow {
-    background-color: #f5f5f7;
+    background-color: #f3f3f3;
 }
 
 QWidget {
@@ -9,111 +14,224 @@ QWidget {
     color: #333333;
 }
 
-/* 文本编辑器 */
-QPlainTextEdit {
+/* ================= Navigation Bar ================= */
+QWidget#navBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* Toggle Sidebar Button */
+QPushButton#navIconBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+}
+QPushButton#navIconBtn:hover {
+    background-color: #f0f0f0;
+}
+QPushButton#navIconBtn:checked {
+    background-color: #e5e5e5; /* Active state */
+}
+QPushButton#navIconBtn:pressed {
+    background-color: #dcdcdc;
+}
+
+/* Main Nav Tabs */
+QPushButton#navBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #666666;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 4px 2px;
+}
+
+QPushButton#navBtn:hover {
+    background-color: #f0f0f0;
+    color: #333333;
+}
+
+QPushButton#navBtn:checked {
+    background-color: #e5f1fb; /* Light blue background */
+    color: #0078d4;
+}
+
+QPushButton#navBtn:pressed {
+    background-color: #cce4f7;
+    transform: translateY(1px); /* Simple press effect */
+}
+
+QPushButton#navBtn:disabled {
+    color: #cccccc;
+    background-color: transparent;
+}
+
+/* Nav Tool Buttons (Right side) */
+QPushButton#navToolBtn {
     background-color: #ffffff;
     border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 8px;
-    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    border-radius: 4px;
+    color: #333333;
+    padding: 6px 12px;
     font-size: 13px;
-    selection-background-color: #0078d4;
-    selection-color: #ffffff;
+    margin-left: 8px;
 }
 
-QPlainTextEdit:focus {
-    border: 1px solid #0078d4;
+QPushButton#navToolBtn:hover {
+    background-color: #f8f9fa;
+    border-color: #d0d0d0;
+    /* Subtle shadow on hover */
+    /* qproperty-shadow is not standard CSS, handled by widget usually */
 }
 
-QPlainTextEdit[readOnly="true"] {
-    background-color: #fafafa;
-    color: #555555;
+QPushButton#navToolBtn:pressed {
+    background-color: #f0f0f0;
+    border-color: #c0c0c0;
 }
 
-/* 侧边栏 / 规则 */
-QScrollArea {
+/* ================= Sidebar ================= */
+QWidget#sidebarContainer {
+    background-color: #f8f9fa; /* Slightly darker than editor */
+    border-right: 1px solid #e0e0e0;
+}
+
+QTabWidget#sidebarTabs::pane {
     border: none;
     background-color: transparent;
 }
 
-QWidget#rulesContainer {
-    background-color: #ffffff;
-    border-right: 1px solid #e0e0e0;
+QTabWidget#sidebarTabs::tab-bar {
+    alignment: left;
 }
 
-QCheckBox {
-    spacing: 8px;
-    padding: 6px 10px;
-    border-radius: 4px;
+QTabBar::tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 12px;
+    margin-right: 2px;
+    font-size: 13px;
+    color: #555555;
 }
 
-QCheckBox:hover {
-    background-color: #f0f0f0;
+QTabBar::tab:hover {
+    background-color: #e5eff8;
+    color: #0078d4;
 }
 
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border: 1px solid #cccccc;
-    border-radius: 3px;
-    background-color: #ffffff;
+QTabBar::tab:selected {
+    color: #0078d4;
+    border-bottom: 2px solid #0078d4;
+    font-weight: bold;
 }
 
-QCheckBox::indicator:checked {
-    background-color: #0078d4;
-    border-color: #0078d4;
+QLabel#sectionTitle {
+    font-size: 13px;
+    font-weight: bold;
+    color: #777777;
+    text-transform: uppercase;
+    margin: 16px 0 8px 0;
+    padding-left: 4px;
 }
 
-/* 分割器 */
+/* Sidebar Action Buttons */
+QWidget#sidebarContainer QPushButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #444444;
+    text-align: left;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+QWidget#sidebarContainer QPushButton:hover {
+    background-color: #f3f3f3;
+    color: #000000;
+}
+
+QWidget#sidebarContainer QPushButton:pressed {
+    background-color: #ebebeb;
+    padding-left: 14px; /* Indent effect */
+}
+
+/* ================= Editors ================= */
 QSplitter::handle {
     background-color: #e0e0e0;
-    height: 2px;
 }
-
 QSplitter::handle:hover {
     background-color: #0078d4;
 }
 
-/* 工具栏 */
-QToolBar {
-    background-color: #ffffff;
+QWidget#editorHeader {
+    background-color: #f8f9fa;
     border-bottom: 1px solid #e0e0e0;
-    spacing: 10px;
-    padding: 6px;
 }
 
-QToolButton {
+QWidget#editorHeader QLabel {
+    font-weight: 600;
+    color: #555555;
+}
+
+QPushButton#headerBtn {
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
-    padding: 6px;
+    padding: 4px 8px;
+    color: #666666;
+}
+QPushButton#headerBtn:hover {
+    background-color: #e9ecef;
+    color: #333333;
+}
+QPushButton#headerBtn:pressed {
+    background-color: #dee2e6;
 }
 
-QToolButton:hover {
-    background-color: #f0f0f0;
-    border: 1px solid #d0d0d0;
+QPlainTextEdit {
+    background-color: #ffffff;
+    border: none;
+    padding: 12px;
+    font-family: "Consolas", "Cascadia Code", "Menlo", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333333;
 }
 
-QToolButton:pressed {
-    background-color: #e0e0e0;
+QPlainTextEdit[readOnly="true"] {
+    background-color: #fafafa;
 }
 
-/* 状态栏 */
-QStatusBar {
-    background-color: #f5f5f7;
-    border-top: 1px solid #e0e0e0;
+/* ================= Settings ================= */
+QGroupBox {
+    font-weight: bold;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding-top: 20px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px;
     color: #666666;
 }
 
-QStatusBar QLabel {
-    padding: 0 10px;
+QCheckBox {
+    spacing: 8px;
+    padding: 6px;
+    border-radius: 4px;
+}
+QCheckBox:hover {
+    background-color: #f0f0f0;
 }
 
-/* 标题 */
-QLabel#sectionTitle {
-    font-weight: bold;
-    font-size: 16px;
-    margin-bottom: 10px;
-    color: #111111;
+QStatusBar {
+    background-color: #f3f3f3;
+    color: #666666;
+    border-top: 1px solid #e0e0e0;
 }
-
