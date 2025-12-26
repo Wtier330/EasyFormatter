@@ -1,20 +1,25 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Node / NPM
+node_modules/
+ui/node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
 
-# PyInstaller
-*.manifest
-*.spec
-build/
+# Frontend Build Output
+ui/dist/
 dist/
 
-# IDE settings
+# Rust / Tauri
+src-tauri/target/
+target/
+
+# IDE / Editor
 .vscode/
 .idea/
 *.swp
+*.swo
+.DS_Store
+Thumbs.db
 
-# Virtual Environment
-venv/
-env/
-.env
+# Trae / AI
+.trae/

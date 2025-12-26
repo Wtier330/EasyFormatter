@@ -1,155 +1,88 @@
-# EasyFormatter - 通用数据格式化工具
+# EasyFormatter (Tauri Edition)
 
-EasyFormatter 是一款现代化的 Windows 桌面应用程序，旨在帮助开发者和数据分析师快速清洗和规范化“混乱”的文本数据。无论是从网页、日志文件还是 Excel 中复制的数据，只需粘贴即可获得整洁、规范的输出。
+EasyFormatter 是一款基于 Tauri + Vue 3 构建的轻量级、高性能桌面端文本处理工具。旨在为开发者提供“开箱即用”的数据清洗与格式化能力，解决日常开发中频繁遇到的 JSON 校验、文本去噪、格式转换等痛点。
 
-![EasyFormatter Screenshot](https://via.placeholder.com/900x600?text=EasyFormatter+Screenshot)
-*(注：此处可替换为实际截图)*
+## ✨ 核心能力
 
-## 1. 项目概述
+### 1. 文本清洗 (Text Cleaner)
+提供了一套灵活的文本处理流水线，支持对杂乱文本进行快速清洗：
+- **行处理**：去除首尾空格、去除空行、仅保留数字。
+- **全文处理**：合并连续空白、去除特定分隔符、去重（保持顺序）。
+- **预设模式**：内置“常规清洗”、“仅保留数字”、“结构化清洗”等常用组合。
 
-**核心用途**：将杂乱的文本数据快速转换为可搜索、可粘贴、可导入的标准格式。
+### 2. JSON 工具箱 (JSON Tools)
+集成了专业的 JSON 编辑与处理环境，基于 Monaco Editor 内核：
+- **双栏视图**：左侧输入/右侧预览，支持实时语法校验。
+- **格式化**：支持 美化 (Beautify) 与 压缩 (Minify)，可自定义缩进（2空格/4空格/Tab）。
+- **智能排序**：支持对 JSON 对象键值进行字母序递归排序 (Sort Keys)。
+- **转义处理**：一键 Stringify 转义与 Unescape 反转义。
 
-**主要功能**：
-*   **实时预览**：输入内容变化或规则调整时，输出结果即时更新。
-*   **规则组合**：支持多选框灵活组合多种清洗规则。
-*   **一键操作**：支持一键复制、粘贴、清空及保存文件。
-*   **美观易用**：基于 PySide6 的现代化界面，支持高分屏缩放。
-*   **完全本地化**：全中文界面与提示，符合国内用户习惯。
+## 🛠 技术架构
 
-## 2. 安装指南
+本项目采用前后端分离架构，充分利用系统原生能力与 Web 生态：
 
-### 前置要求
-*   Windows 10/11
-*   Python 3.9 或更高版本
+- **后端 (Rust)**: `src-tauri`
+  - 负责核心计算逻辑（如 JSON 解析排序、正则处理），确保高性能。
+  - 管理系统交互（文件读写、剪贴板、Dialog）。
+- **前端 (Vue 3 + TypeScript)**: `ui`
+  - 基于 Naive UI 组件库，遵循 [WindowAndLayoutSpec](./ui/WindowAndLayoutSpec.md) 规范。
+  - 集成 Monaco Editor 提供 IDE 级的代码编辑体验。
+  - 使用 Pinia 进行状态管理与持久化。
 
-### 安装步骤
+## 🚀 快速开始
 
-1.  **克隆或下载项目**
-    ```bash
-    git clone https://github.com/yourusername/EasyFormatter.git
-    cd EasyFormatter
-    ```
+### 环境准备
+- **Node.js**: 推荐 v18+
+- **Rust**: 请通过 [rustup](https://rustup.rs/) 安装最新稳定版。
+- **Windows**: 需安装 C++ 生成工具 (Visual Studio Build Tools)。
 
-2.  **创建虚拟环境（推荐）**
-    ```bash
-    python -m venv venv
-    .\venv\Scripts\activate
-    ```
+### 开发指南
 
-3.  **安装依赖**
-    ```bash
-    pip install -r requirements.txt
-    ```
+1. **安装前端依赖**
+   ```bash
+   cd ui
+   npm install
+   ```
 
-4.  **运行应用**
-    ```bash
-    python main.py
-    ```
+2. **启动开发环境**
+   在项目根目录运行：
+   ```bash
+   # 自动启动后端与前端热更新服务
+   npm run tauri dev --prefix ui
+   # 或者直接使用 tauri cli
+   tauri dev
+   ```
 
-### 打包为 EXE
-如果您希望生成无需 Python 环境即可运行的可执行文件：
-1.  确保已安装依赖。
-2.  运行根目录下的打包脚本：
-    ```cmd
-    build_exe.bat
-    ```
-3.  打包完成后，在 `dist` 目录下找到 `EasyFormatter.exe` 即可直接运行。
+### 构建发布
 
-## 3. 使用说明
-
-1.  **输入数据**：
-    *   在左侧/上方的“输入内容”框中粘贴您的原始文本。
-    *   或者点击工具栏的“粘贴到输入”按钮（图标：向下箭头）。
-
-2.  **选择规则**：
-    *   在左侧“转换规则”面板中勾选您需要的处理规则。
-    *   默认开启：去除首尾空格、去除分隔符、统一换行。
-    *   勾选状态改变时，右侧/下方的“格式化结果”会自动刷新。
-
-3.  **获取结果**：
-    *   查看“格式化结果”框中的内容。
-    *   点击工具栏的“复制输出”按钮（图标：对号）将结果复制到剪贴板。
-    *   点击“保存文件”按钮（图标：软盘）将结果导出为 `.txt` 文件。
-
-4.  **状态监控**：
-    *   底部状态栏会实时显示处理后的**字符数**和**行数**。
-
-## 4. 配置选项 (规则说明)
-
-目前支持以下核心规则，可通过界面左侧复选框启用：
-
-| 规则名称 | 默认状态 | 功能描述 |
-| :--- | :--- | :--- |
-| **去除首尾空格** | ✅ 开启 | 删除每一行开头和结尾的空白字符（空格、Tab）。 |
-| **去除分隔符** | ✅ 开启 | 删除常见的标点符号，包括逗号(`,，`)、分号(`;；`)、顿号(`、`)。 |
-| **统一换行** | ✅ 开启 | 将所有换行符标准化为系统默认格式（通常为 `\n`）。 |
-| **只保留数字** | ⬜ 关闭 | 仅提取每行中的数字字符（0-9），其余字符将被丢弃。 |
-| **合并空白** | ⬜ 关闭 | 将行内连续的多个空白字符（如多个空格或 Tab）合并为一个空格。 |
-| **行去重** | ⬜ 关闭 | 删除重复的行，仅保留第一次出现的版本（保持原顺序）。 |
-| **去除空行** | ⬜ 关闭 | 删除完全为空或只包含空白字符的行。 |
-
-## 5. 开发与扩展
-
-本项目采用清晰的分层架构，方便开发者扩展新功能。
-
-### 目录结构
-*   `app/`：应用代码。
-    *   `core/`：核心业务逻辑（规则、管道）。
-    *   `services/`：服务层封装（剪贴板、文件、预设、设置、耗时统计）。
-    *   `ui/`：用户界面与样式资源。
-*   `config/`：默认配置。
-*   `tests/`：单元测试。
-
-### 如何添加新规则
-
-无需修改 UI 代码，只需修改 `app/core/rules.py`：
-
-1.  **定义处理函数**：
-    ```python
-    def rule_my_new_feature(text: str) -> str:
-        # 你的处理逻辑，例如转大写
-        return text.upper()
-    ```
-
-2.  **注册规则**：
-    在 `ALL_RULES` 列表中添加 `Rule` 对象：
-    ```python
-    Rule(
-        id="to_upper",
-        label="转大写",
-        description="将所有字母转换为大写",
-        default_enabled=False,
-        func=rule_my_new_feature,
-        order=70 # 设置执行顺序
-    )
-    ```
-    重新运行程序，新规则将自动出现在侧边栏中。
-
-## 6. 常见问题 (FAQ)
-
-**Q: 输入大量文本时会卡顿吗？**
-A: 工具内置了 150ms 的防抖机制，能够流畅处理数万行文本。对于超大文件（如数百MB），建议分批处理。
-
-**Q: 打包后的 exe 文件打不开？**
-A: 请确保打包时没有报错。如果提示缺少 DLL，请检查是否在干净的虚拟环境中打包，并确保安装了最新版的 PyInstaller。
-
-**Q: 为什么“只保留数字”后出现了很多空行？**
-A: 如果某一行原本没有数字，提取后就会变成空行。建议同时勾选“去除空行”规则来获得紧凑的结果。
-
-## 7. 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1.  Fork 本仓库。
-2.  创建您的特性分支 (`git checkout -b feature/AmazingFeature`)。
-3.  提交您的更改 (`git commit -m 'Add some AmazingFeature'`)。
-4.  推送到分支 (`git push origin feature/AmazingFeature`)。
-5.  开启一个 Pull Request。
-
-请确保您的代码通过了现有的单元测试：
+构建生产环境安装包（支持 MSI/EXE）：
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+cd ui
+npm run tauri build
+```
+构建产物将输出至 `src-tauri/target/release/bundle/` 目录。
+
+## 📂 目录结构说明
+
+```
+EasyFormatter/
+├── src-tauri/              # Rust 后端工程
+│   ├── src/
+│   │   ├── core/           # 核心业务逻辑 (Formatter, JsonTools)
+│   │   └── commands/       # Tauri 命令接口定义
+│   ├── capabilities/       # 权限控制配置
+│   └── tauri.conf.json     # Tauri 应用配置
+├── ui/                     # Vue 前端工程
+│   ├── src/
+│   │   ├── pages/          # 业务视图 (JsonView, FormatterView)
+│   │   ├── components/     # 公共组件 (MonacoEditor)
+│   │   └── stores/         # 状态管理
+│   └── WindowAndLayoutSpec.md # UI/UX 设计规范
+└── README.md               # 项目说明文档
 ```
 
----
-© 2025 EasyFormatter Team. License: MIT.
+## 📝 贡献指南
+
+- 提交代码前请确保运行无报错。
+- UI 修改请严格遵循 `ui/WindowAndLayoutSpec.md` 中的布局原则。
+- 核心逻辑变更需同步更新 Rust 文档注释。
