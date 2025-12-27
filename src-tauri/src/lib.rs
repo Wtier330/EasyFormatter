@@ -17,7 +17,8 @@ pub fn run() {
             commands::read_text,
             commands::write_text,
             commands::reveal_in_explorer,
-            commands::run_decrypt
+            commands::run_decrypt,
+            commands::open_devtools
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

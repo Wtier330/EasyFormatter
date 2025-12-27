@@ -1,7 +1,11 @@
 <template>
   <div class="editor-wrapper">
     <!-- Line Numbers -->
-    <div class="line-numbers" ref="lineNumbersRef" :style="{ paddingTop: padding + 'px' }">
+    <div 
+      class="line-numbers" 
+      ref="lineNumbersRef" 
+      :style="{ paddingTop: padding + 'px', fontSize: appStore.fontSize + 'px' }"
+    >
       <div v-for="n in lineCount" :key="n" class="line-num" :class="{ active: currentLine === n }">
         {{ n }}
       </div>
@@ -18,6 +22,7 @@
         :bordered="false"
         class="editor-input"
         :class="{ 'no-wrap': !appStore.wordWrap }"
+        :style="{ fontSize: appStore.fontSize + 'px' }"
         @input="onInput"
         @click="updateCursor"
         @keyup="updateCursor"
@@ -135,81 +140,61 @@ defineExpose({ locate });
 <style scoped>
 .editor-wrapper {
   height: 100%;
-  width: 100%;
   display: flex;
+  flex-direction: column;
   position: relative;
-  overflow: hidden;
   background-color: #fff;
-  border-radius: 8px; /* Match visual optimization */
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .line-numbers {
-  width: 45px;
-  background-color: #f5f7fa; /* Lighter gray */
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  background-color: #f5f7fa;
   border-right: 1px solid #eee;
-  color: #999;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  line-height: 1.6; /* Match editor */
-  text-align: right;
-  padding-right: 8px;
+  padding: 12px 0;
+  overflow: hidden;
   user-select: none;
-  overflow: hidden; /* No scrollbar, synced via JS */
-  flex-shrink: 0;
-}
-
-.line-num {
-  padding: 0 2px;
-}
-.line-num.active {
-  background-color: #e0e0e0;
-  color: #333;
-  font-weight: bold;
+  text-align: right;
+  color: #999;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  z-index: 10;
 }
 
 .editor-main {
   flex: 1;
-  height: 100%;
-  min-width: 0; /* Flexbox fix */
+  overflow: hidden;
+  margin-left: 40px;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-input {
-  height: 100%;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  flex: 1;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
 }
 
-:deep(.n-input) {
-  border-radius: 0; /* Remove default border radius to match container */
-}
-
+/* Deep selector for Naive UI textarea to control height */
+:deep(.n-input-wrapper),
 :deep(.n-input__textarea-el) {
   height: 100% !important;
-  padding: 12px !important; /* Fixed padding */
-  white-space: pre; /* Default no wrap for code editors usually, but we make it toggleable */
-  overflow-x: auto;
 }
 
-.no-wrap :deep(.n-input__textarea-el) {
+.line-num {
+  padding-right: 8px;
+  line-height: 1.5;
+  height: 1.5em; /* Fallback */
+}
+.line-num.active {
+  color: #333;
+  font-weight: bold;
+  background-color: #e6f7ff;
+}
+
+.no-wrap :deep(textarea) {
   white-space: pre !important;
   overflow-x: auto !important;
-}
-
-:deep(.n-input__textarea-el) {
-    /* If word wrap is enabled (default in NInput unless we override) */
-    /* We handle it via class */
-}
-
-/* When wrapping is enabled (class not present) */
-:not(.no-wrap) :deep(.n-input__textarea-el) {
-  white-space: pre-wrap !important;
-  word-break: break-all;
-}
-
-:deep(.n-input--focus) {
-  /* Remove default focus ring or customize it */
-  box-shadow: none !important;
 }
 </style>

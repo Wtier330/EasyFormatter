@@ -1,13 +1,5 @@
 <template>
   <div class="json-tree-container">
-    <div class="tree-toolbar">
-      <div class="title">结构预览</div>
-      <n-button-group size="tiny">
-        <n-button @click="expandAll">全展开</n-button>
-        <n-button @click="collapseAll">全折叠</n-button>
-      </n-button-group>
-    </div>
-    
     <div class="tree-content" v-if="hasData">
       <JsonNode
         :data="treeData"
@@ -26,12 +18,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { NButton, NButtonGroup, NIcon } from 'naive-ui';
+import { computed, ref, defineExpose, watch } from 'vue';
+import { NIcon } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
+import { useAppStore } from '../../stores/app';
 import JsonNode from './JsonNode.vue';
 
 const configStore = useConfigStore();
+const appStore = useAppStore();
 const expandLevel = ref(1); // 0=none, 999=all
 
 const treeData = computed(() => {
@@ -42,17 +36,25 @@ const hasData = computed(() => treeData.value !== null && treeData.value !== und
 
 function expandAll() {
   expandLevel.value = 999;
-  // Reset after tick to allow re-collapsing? 
-  // Actually recursive component watches this value.
-  // If we want to allow manual collapse afterwards, the logic in JsonNode handles manual toggle.
-  // But if we set it to 999, it forces open. 
-  // We might need a timestamp or trigger.
-  // For simplicity, just set large number.
 }
 
 function collapseAll() {
   expandLevel.value = 0;
 }
+
+// Watch for global triggers from FunctionBar
+watch(() => appStore.triggerExpand, () => {
+  expandAll();
+});
+
+watch(() => appStore.triggerCollapse, () => {
+  collapseAll();
+});
+
+defineExpose({
+  expandAll,
+  collapseAll
+});
 </script>
 
 <style scoped>
@@ -61,19 +63,6 @@ function collapseAll() {
   display: flex;
   flex-direction: column;
   background-color: #fff;
-}
-.tree-toolbar {
-  padding: 8px;
-  border-bottom: 1px solid var(--n-border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-.title {
-  font-weight: bold;
-  font-size: 13px;
-  color: #333;
 }
 .tree-content {
   flex: 1;

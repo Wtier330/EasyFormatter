@@ -1,6 +1,7 @@
 <template>
   <div class="app-shell">
     <Toolbar class="header-area" />
+    <FunctionBar />
     
     <div class="main-area" ref="mainArea">
       <!-- Sidebar -->
@@ -51,6 +52,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import Toolbar from './Toolbar.vue';
+import FunctionBar from './FunctionBar.vue';
 import StatusBar from './StatusBar.vue';
 import SidebarFiles from './SidebarFiles.vue';
 import Splitter from './Splitter.vue';
@@ -118,6 +120,9 @@ function onResizePreview(delta: number) {
   flex-direction: column;
   overflow: hidden;
   background-color: #f5f7fa; /* Unified background */
+  padding-top: 32px; /* 与 toolbar 高度一致 */
+  height: 100vh;
+  box-sizing: border-box;
 }
 .header-area {
   flex-shrink: 0;

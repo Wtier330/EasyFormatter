@@ -33,9 +33,23 @@ export const useAppStore = defineStore('app', () => {
   // New settings
   const wordWrap = ref(initialState.wordWrap ?? false);
   const showRunLog = ref(initialState.showRunLog ?? false);
+  const indentSize = ref(initialState.indentSize ?? 2);
+  const fontSize = ref(initialState.fontSize ?? 14);
+
+  // Triggers for Expand/Collapse (watched by JsonTree)
+  const triggerExpand = ref(0);
+  const triggerCollapse = ref(0);
+
+  function requestExpand() {
+    triggerExpand.value++;
+  }
+
+  function requestCollapse() {
+    triggerCollapse.value++;
+  }
 
   // Persist
-  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, showRunLog], () => {
+  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, showRunLog, indentSize, fontSize], () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       theme: theme.value,
       sidebarWidth: sidebarWidth.value,
@@ -43,7 +57,9 @@ export const useAppStore = defineStore('app', () => {
       recentFiles: recentFiles.value,
       favorites: favorites.value,
       wordWrap: wordWrap.value,
-      showRunLog: showRunLog.value
+      showRunLog: showRunLog.value,
+      indentSize: indentSize.value,
+      fontSize: fontSize.value
     }));
   }, { deep: true });
 
@@ -84,9 +100,15 @@ export const useAppStore = defineStore('app', () => {
     favorites,
     wordWrap,
     showRunLog,
+    indentSize,
+    fontSize,
+    triggerExpand,
+    triggerCollapse,
     addRecentFile,
     removeRecentFile,
     toggleWordWrap,
-    toggleRunLog
+    toggleRunLog,
+    requestExpand,
+    requestCollapse
   };
 });

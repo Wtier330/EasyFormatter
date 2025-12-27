@@ -76,7 +76,7 @@ export const useConfigStore = defineStore('config', () => {
   function format() {
     const { data, error } = safeParse(rawText.value);
     if (!error && data) {
-      const formatted = formatJson(data);
+      const formatted = formatJson(data, appStore.indentSize);
       if (formatted !== rawText.value) {
         rawText.value = formatted;
         isDirty.value = true;

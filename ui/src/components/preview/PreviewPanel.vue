@@ -3,7 +3,7 @@
     <!-- Show RunLog if active, otherwise show Tree -->
     <div class="content-wrapper">
       <div v-show="!appStore.showRunLog" class="pane-content">
-        <JsonTree class="tree-area" />
+        <JsonTree class="tree-area" ref="jsonTreeRef" />
         <ErrorsPanel v-if="hasErrors" />
       </div>
       
@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import JsonTree from './JsonTree.vue';
 import ErrorsPanel from './ErrorsPanel.vue';
 import RunLogPanel from './RunLogPanel.vue';
@@ -26,6 +26,7 @@ const configStore = useConfigStore();
 const appStore = useAppStore();
 
 const hasErrors = computed(() => !!configStore.parseError || configStore.validationErrors.length > 0);
+const jsonTreeRef = ref<any>(null);
 </script>
 
 <style scoped>
@@ -33,8 +34,7 @@ const hasErrors = computed(() => !!configStore.parseError || configStore.validat
   height: 100%;
   display: flex;
   flex-direction: column;
-  /* Visuals handled by parent container (AppShell) */
-  background-color: transparent; 
+  background-color: #fff;
   overflow: hidden;
 }
 

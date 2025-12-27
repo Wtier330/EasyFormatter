@@ -1,8 +1,13 @@
 use crate::core::formatter::pipeline::{process_text, FormatOptions, FormatResult};
 use crate::core::json_tools::{self, JsonMode, JsonOptions};
 use std::fs;
-use tauri::{AppHandle};
+use tauri::{AppHandle, WebviewWindow};
 use tauri::Emitter;
+
+#[tauri::command]
+pub fn open_devtools(window: WebviewWindow) {
+    window.open_devtools();
+}
 
 #[tauri::command]
 pub fn format_text(text: String, options: FormatOptions) -> FormatResult {

@@ -13,22 +13,22 @@ import { computed, onMounted } from 'vue';
 import { darkTheme, zhCN, dateZhCN, NConfigProvider, NMessageProvider, NDialogProvider } from 'naive-ui';
 import AppShell from './components/layout/AppShell.vue';
 import { useAppStore } from './stores/app';
-import { events, commands } from './tauri';
-import { useConfigStore } from './stores/config';
+// import { events, commands } from './tauri';
+// import { useConfigStore } from './stores/config';
 
 const appStore = useAppStore();
-const configStore = useConfigStore();
+// const configStore = useConfigStore();
 
 const theme = computed(() => appStore.theme === 'dark' ? darkTheme : null);
 
 onMounted(() => {
-  events.onCloseRequested(async () => {
-    if (configStore.isDirty) {
-      // In a real scenario, this would need Rust side interception to be effective blocking.
-      // Here we provide the notification.
-      await commands.showError('有未保存的更改！请保存或丢弃。');
-    }
-  });
+  // events.onCloseRequested(async () => {
+  //   if (configStore.isDirty) {
+  //     // In a real scenario, this would need Rust side interception to be effective blocking.
+  //     // Here we provide the notification.
+  //     await commands.showError('有未保存的更改！请保存或丢弃。');
+  //   }
+  // });
 });
 </script>
 

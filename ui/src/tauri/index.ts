@@ -17,6 +17,8 @@ export const commands = {
   
   runDecrypt: (configJson: string, workingDir: string) => 
     invoke<void>('run_decrypt', { configJson, workingDir }),
+
+  openDevtools: () => invoke<void>('open_devtools'),
     
   // Frontend-only wrappers
   pickFile: async () => {
