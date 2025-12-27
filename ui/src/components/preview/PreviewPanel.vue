@@ -1,28 +1,30 @@
 <template>
   <div class="preview-panel">
-    <n-tabs type="segment" animated class="preview-tabs">
-      <n-tab-pane name="tree" tab="结构预览">
-        <div class="pane-content">
-          <JsonTree class="tree-area" />
-          <ErrorsPanel v-if="hasErrors" />
-        </div>
-      </n-tab-pane>
-      <n-tab-pane name="logs" tab="运行日志">
+    <!-- Show RunLog if active, otherwise show Tree -->
+    <div class="content-wrapper">
+      <div v-show="!appStore.showRunLog" class="pane-content">
+        <JsonTree class="tree-area" />
+        <ErrorsPanel v-if="hasErrors" />
+      </div>
+      
+      <div v-show="appStore.showRunLog" class="pane-content">
         <RunLogPanel />
-      </n-tab-pane>
-    </n-tabs>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { NTabs, NTabPane } from 'naive-ui';
 import JsonTree from './JsonTree.vue';
 import ErrorsPanel from './ErrorsPanel.vue';
 import RunLogPanel from './RunLogPanel.vue';
 import { useConfigStore } from '../../stores/config';
+import { useAppStore } from '../../stores/app';
 
 const configStore = useConfigStore();
+const appStore = useAppStore();
+
 const hasErrors = computed(() => !!configStore.parseError || configStore.validationErrors.length > 0);
 </script>
 
@@ -31,25 +33,26 @@ const hasErrors = computed(() => !!configStore.parseError || configStore.validat
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.preview-tabs {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-:deep(.n-tabs-pane-wrapper) {
-  flex: 1;
+  /* Visuals handled by parent container (AppShell) */
+  background-color: transparent; 
   overflow: hidden;
 }
-:deep(.n-tab-pane) {
-  height: 100%;
-  padding: 0 !important;
-}
-.pane-content {
-  height: 100%;
+
+.content-wrapper {
+  flex: 1;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
+
+.pane-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .tree-area {
   flex: 1;
   overflow: hidden;

@@ -18,6 +18,8 @@ export const useConfigStore = defineStore('config', () => {
   const lastValidConfig = ref<any>(null);
   const parseError = ref<string | null>(null);
   const validationErrors = ref<ValidationError[]>([]);
+  const cursorPos = ref({ line: 1, col: 1 });
+  const locateRequest = ref<string | null>(null);
 
   // Actions
   async function loadFile(path: string) {
@@ -101,6 +103,8 @@ export const useConfigStore = defineStore('config', () => {
     lastValidConfig,
     parseError,
     validationErrors,
+    cursorPos,
+    locateRequest,
     loadFile,
     saveFile,
     updateText,

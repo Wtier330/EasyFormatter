@@ -1,8 +1,16 @@
+export interface RecentFileItem {
+  path: string;
+  name: string;
+  size?: number; // in bytes
+  lastModified?: number; // timestamp
+  lastOpened?: number; // timestamp
+}
+
 export interface AppConfig {
   theme: 'light' | 'dark' | 'auto';
   sidebarWidth: number;
   previewWidth: number;
-  recentFiles: string[];
+  recentFiles: RecentFileItem[];
   favorites: string[];
 }
 

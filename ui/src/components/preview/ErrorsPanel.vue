@@ -11,7 +11,12 @@
       </n-list-item>
       
       <!-- Validation Errors -->
-      <n-list-item v-for="(err, idx) in configStore.validationErrors" :key="idx" class="error-item">
+      <n-list-item 
+        v-for="(err, idx) in configStore.validationErrors" 
+        :key="idx" 
+        class="error-item"
+        @click="locate(err.path)"
+      >
         <div class="path">{{ err.path }}</div>
         <div class="msg">{{ err.message }}</div>
       </n-list-item>
@@ -28,6 +33,26 @@ const configStore = useConfigStore();
 
 const hasErrors = computed(() => !!configStore.parseError || configStore.validationErrors.length > 0);
 const errorCount = computed(() => (configStore.parseError ? 1 : 0) + configStore.validationErrors.length);
+
+function locate(path: string) {
+  if (path) {
+    // path is like "root.log_configs[0].pattern"
+    // Editor locate uses simple key search.
+    // Tree locate uses full path expansion.
+    // Let's support Editor locate first by extracting the last key.
+    const parts = path.split(/[.\[\]]/).filter(p => p && p !== 'root');
+    const key = parts[parts.length - 1];
+    
+    // Request locate in Editor
+    if (key) {
+       configStore.locateRequest = key;
+    }
+    
+    // TODO: Also expand Tree to this path? 
+    // Tree needs to watch locateRequest too?
+    // Or we add `expandToPath` in store?
+  }
+}
 </script>
 
 <style scoped>
