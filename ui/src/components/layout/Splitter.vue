@@ -1,5 +1,9 @@
 <template>
-  <div class="splitter" @mousedown="startDrag">
+  <div 
+    class="splitter" 
+    :class="{ dragging: isDragging }"
+    @mousedown="startDrag"
+  >
     <div class="splitter-line"></div>
   </div>
 </template>
@@ -60,7 +64,6 @@ onUnmounted(() => stopDrag()); // cleanup safety
 }
 
 .splitter-line {
-  width: 1px; /* Refined to 1px for cleaner look or 2px as requested previously? User said "Default ... Gray". Usually 1px is cleaner for gray lines. Let's stick to 2px for visibility or 1px for precision. User requirement doesn't specify width, just color. I'll keep 2px for easier clicking visual, or 1px for standard UI. Let's use 2px to match "visual state" emphasis. */
   width: 2px;
   height: 100%;
   background-color: var(--splitter-color-idle);
@@ -68,12 +71,7 @@ onUnmounted(() => stopDrag()); // cleanup safety
 }
 
 .splitter:hover .splitter-line,
-.splitter:active .splitter-line {
-  background-color: var(--splitter-color-active);
-}
-
-/* When dragging, force active color even if cursor moves out slightly */
-.splitter:active .splitter-line {
+.splitter.dragging .splitter-line {
   background-color: var(--splitter-color-active);
 }
 </style>

@@ -16,7 +16,7 @@ export const useAppStore = defineStore('app', () => {
 
   const theme = ref<'light' | 'dark' | 'auto'>(initialState.theme || 'auto');
   const sidebarWidth = ref(initialState.sidebarWidth || 220);
-  const previewWidth = ref(initialState.previewWidth || 500);
+  const previewRatio = ref(initialState.previewRatio || 0.45);
   const favorites = ref<string[]>(initialState.favorites || []);
   
   // Migration: Convert string[] to RecentFileItem[]
@@ -35,11 +35,11 @@ export const useAppStore = defineStore('app', () => {
   const showRunLog = ref(initialState.showRunLog ?? false);
 
   // Persist
-  watch([theme, sidebarWidth, previewWidth, recentFiles, favorites, wordWrap, showRunLog], () => {
+  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, showRunLog], () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       theme: theme.value,
       sidebarWidth: sidebarWidth.value,
-      previewWidth: previewWidth.value,
+      previewRatio: previewRatio.value,
       recentFiles: recentFiles.value,
       favorites: favorites.value,
       wordWrap: wordWrap.value,
@@ -79,7 +79,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     theme,
     sidebarWidth,
-    previewWidth,
+    previewRatio,
     recentFiles,
     favorites,
     wordWrap,

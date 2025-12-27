@@ -17,7 +17,7 @@
       />
       
       <!-- Content Wrapper for Editor and Preview -->
-      <div class="content-wrapper">
+      <div class="content-wrapper" ref="contentWrapper">
         <!-- Editor (Main) -->
         <div 
           class="editor-area ui-panel"
@@ -36,7 +36,7 @@
         <!-- Preview -->
         <div 
           class="preview-area ui-panel" 
-          :style="{ width: appStore.previewWidth + 'px' }"
+          :style="{ width: (appStore.previewRatio * 100) + '%' }"
           :class="{ 'panel-active': isResizingPreview }"
         >
           <PreviewPanel />
@@ -60,6 +60,7 @@ import { useAppStore } from '../../stores/app';
 
 const appStore = useAppStore();
 const mainArea = ref<HTMLElement | null>(null);
+const contentWrapper = ref<HTMLElement | null>(null);
 const isResizingPreview = ref(false);
 
 function onResizeSidebar(delta: number) {
@@ -73,13 +74,39 @@ function onResizeSidebar(delta: number) {
 }
 
 function onResizePreview(delta: number) {
-  // delta > 0 => preview shrinks
-  const proposedWidth = appStore.previewWidth - delta;
+  if (!contentWrapper.value) return;
   
-  if (proposedWidth < 200) return;
-  if (mainArea.value && proposedWidth > mainArea.value.clientWidth * 0.6) return;
+  const containerWidth = contentWrapper.value.clientWidth;
+  if (containerWidth <= 0) return;
 
-  appStore.previewWidth = proposedWidth;
+  // Calculate current width in pixels from ratio
+  const currentPx = containerWidth * appStore.previewRatio;
+  
+  // delta > 0 => preview shrinks
+  const proposedPx = currentPx - delta;
+  
+  // Convert to ratio
+  let newRatio = proposedPx / containerWidth;
+
+  // Constraints: 20% to 80%
+  if (newRatio < 0.2) newRatio = 0.2;
+  if (newRatio > 0.8) newRatio = 0.8;
+  
+  // Min pixel check (e.g. 200px) for both Preview and Editor
+  // Ensure Preview is at least 200px
+  if (newRatio * containerWidth < 200) {
+    newRatio = 200 / containerWidth;
+  }
+  // Ensure Editor (remaining space) is at least 200px
+  if ((1 - newRatio) * containerWidth < 200) {
+    newRatio = (containerWidth - 200) / containerWidth;
+  }
+  
+  // Safety clamp 0.1-0.9 to prevent total collapse
+  if (newRatio < 0.1) newRatio = 0.1;
+  if (newRatio > 0.9) newRatio = 0.9;
+
+  appStore.previewRatio = newRatio;
 }
 </script>
 
@@ -105,42 +132,60 @@ function onResizePreview(delta: number) {
 .main-area {
   flex: 1;
   display: flex;
-  min-height: 0; /* Fix flex overflow */
+  overflow: hidden;
+  position: relative;
+  /* Add padding to create separation from window edges if desired, 
+     but usually IDEs fill the space. 
+     Based on "unified UI", let's keep it flush but use internal padding in panels. */
+  padding: 8px; /* Outer padding for the floating panel look */
+  gap: 0; /* Gap is handled by Splitter */
 }
+
 .sidebar-area {
   flex-shrink: 0;
-  background-color: #fff;
-  border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-}
-.content-wrapper {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-  padding: 12px 12px 12px 0; /* Padding for editor/preview area */
-  gap: 0; /* Gap handled by splitter width */
-}
-.ui-panel {
   background-color: var(--panel-bg-color);
   border: 1px solid var(--panel-border-color);
   border-radius: var(--panel-border-radius);
-  padding: var(--panel-padding);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  /* Optional: shadow */
+}
+
+.content-wrapper {
+  flex: 1;
+  display: flex;
   overflow: hidden;
+  /* No border/bg for wrapper itself, it just holds Editor+Splitter+Preview */
+}
+
+.editor-area {
+  flex: 1; /* Takes remaining space */
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Important for flex child text truncation */
+  background-color: var(--panel-bg-color);
+  border: 1px solid var(--panel-border-color);
+  border-radius: var(--panel-border-radius);
 }
+
+.preview-area {
+  flex-shrink: 0; /* Fixed width based on style */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: var(--panel-bg-color);
+  border: 1px solid var(--panel-border-color);
+  border-radius: var(--panel-border-radius);
+}
+
+/* Panel Active State for resizing visualization */
 .panel-active {
   border-color: var(--panel-border-active);
+  transition: border-color 0.2s;
 }
-.editor-area {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 100%;
-}
-.preview-area {
-  flex-shrink: 0;
-  height: 100%;
+
+/* Unified Panel Class (can be moved to global if needed) */
+.ui-panel {
+  overflow: hidden; /* Ensure content doesn't spill rounded corners */
 }
 </style>
