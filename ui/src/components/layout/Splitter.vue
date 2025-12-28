@@ -52,13 +52,13 @@ onUnmounted(() => stopDrag()); // cleanup safety
 
 <style scoped>
 .splitter {
-  width: 12px; /* Maintain hit area */
+  width: 12px;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: col-resize;
-  z-index: 10;
+  z-index: 50;
   flex-shrink: 0;
   background-color: transparent;
 }
@@ -66,12 +66,15 @@ onUnmounted(() => stopDrag()); // cleanup safety
 .splitter-line {
   width: 2px;
   height: 100%;
+  /* ✅ 默认显示“淡线” */
   background-color: var(--splitter-color-idle);
   transition: var(--splitter-transition);
 }
 
+/* hover / dragging / 强制可见时高亮 */
 .splitter:hover .splitter-line,
-.splitter.dragging .splitter-line {
+.splitter.dragging .splitter-line,
+.splitter.visible .splitter-line {
   background-color: var(--splitter-color-active);
 }
 </style>

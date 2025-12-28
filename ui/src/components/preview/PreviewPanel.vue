@@ -2,13 +2,9 @@
   <div class="preview-panel">
     <!-- Show RunLog if active, otherwise show Tree -->
     <div class="content-wrapper">
-      <div v-show="!appStore.showRunLog" class="pane-content">
+      <div class="pane-content">
         <JsonTree class="tree-area" ref="jsonTreeRef" :style="{ '--code-font-size': appStore.fontSize + 'px' }" />
         <ErrorsPanel v-if="hasErrors" />
-      </div>
-      
-      <div v-show="appStore.showRunLog" class="pane-content">
-        <RunLogPanel />
       </div>
     </div>
   </div>
@@ -18,7 +14,6 @@
 import { computed, ref } from 'vue';
 import JsonTree from './JsonTree.vue';
 import ErrorsPanel from './ErrorsPanel.vue';
-import RunLogPanel from './RunLogPanel.vue';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 

@@ -11,6 +11,7 @@ export const useConfigStore = defineStore('config', () => {
   
   const currentFilePath = ref<string | null>(null);
   const rawText = ref('');
+  const originalText = ref('');
   const isDirty = ref(false);
   
   // Last Valid Configuration Strategy
@@ -20,6 +21,7 @@ export const useConfigStore = defineStore('config', () => {
   const validationErrors = ref<ValidationError[]>([]);
   const cursorPos = ref({ line: 1, col: 1 });
   const locateRequest = ref<string | null>(null);
+  const pasteRequest = ref<string | null>(null);
 
   // Actions
   async function loadFile(path: string) {
@@ -27,6 +29,7 @@ export const useConfigStore = defineStore('config', () => {
       const text = await commands.readText(path);
       currentFilePath.value = path;
       rawText.value = text;
+      originalText.value = text;
       isDirty.value = false;
       appStore.addRecentFile(path);
       parseAndValidate(text);
@@ -53,11 +56,34 @@ export const useConfigStore = defineStore('config', () => {
 
   function updateText(text: string) {
     rawText.value = text;
-    isDirty.value = true;
+    isDirty.value = text !== originalText.value;
+    parseAndValidate(text);
+  }
+  
+  function setActiveBuffer(path: string | null, text: string, dirty: boolean) {
+    currentFilePath.value = path;
+    rawText.value = text;
+    // originalText should be set by the caller (TabsBar) before calling this,
+    // or passed as an argument. But since we exposed originalText, 
+    // we can rely on caller setting it. 
+    // However, for safety, if we are loading a fresh file (dirty=false), we can sync it here.
+    if (!dirty) {
+        originalText.value = text;
+    }
+    isDirty.value = dirty;
     parseAndValidate(text);
   }
 
   function parseAndValidate(text: string) {
+    if (!text.trim()) {
+      // Handle empty content (e.g. all tabs closed or new file)
+      parseError.value = null;
+      parsedConfig.value = null;
+      lastValidConfig.value = null; // Explicitly clear tree when input is empty
+      validationErrors.value = [];
+      return;
+    }
+
     const { data, error } = safeParse(text);
     if (error) {
       parseError.value = error;
@@ -78,8 +104,8 @@ export const useConfigStore = defineStore('config', () => {
     if (!error && data) {
       const formatted = formatJson(data, appStore.indentSize);
       if (formatted !== rawText.value) {
-        rawText.value = formatted;
-        isDirty.value = true;
+        // 格式化改变了文本 -> updateText 将触发脏检查
+        updateText(formatted);
       }
     }
   }
@@ -89,15 +115,29 @@ export const useConfigStore = defineStore('config', () => {
     if (!error && data) {
       const minified = minifyJson(data);
       if (minified !== rawText.value) {
-        rawText.value = minified;
-        isDirty.value = true;
+        updateText(minified);
       }
     }
+  }
+
+  function startMonitoring() {
+    setInterval(() => {
+        if (appStore.activeTabId) {
+           const tab = appStore.openTabs.find(t => t.id === appStore.activeTabId);
+           if (tab) {
+               if (tab.isDirty !== isDirty.value) {
+                   console.warn('Fixed state mismatch for tab', tab.id);
+                   tab.isDirty = isDirty.value;
+               }
+           }
+        }
+    }, 30000);
   }
 
   return {
     currentFilePath,
     rawText,
+    originalText,
     isDirty,
     parsedConfig,
     lastValidConfig,
@@ -105,10 +145,13 @@ export const useConfigStore = defineStore('config', () => {
     validationErrors,
     cursorPos,
     locateRequest,
+    pasteRequest,
     loadFile,
     saveFile,
     updateText,
     format,
-    minify
+    minify,
+    setActiveBuffer,
+    startMonitoring
   };
 });

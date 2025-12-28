@@ -1,10 +1,10 @@
-// Mock validation for now, can be expanded
+// 配置验证逻辑，可根据需求扩展
 import type { ValidationResult } from '../types/validation';
 
 export function validateConfig(data: any): ValidationResult {
   const errors: any[] = [];
   
-  // Version validation: allow semver string (e.g., "1.0.0") or number
+  // 版本号验证：允许 semver 字符串 (如 "1.0.0") 或数字
   if (data && typeof data === 'object') {
     if ('version' in data) {
       const v = (data as any).version;
@@ -15,7 +15,7 @@ export function validateConfig(data: any): ValidationResult {
       if (!isNumber && !isSemver) {
         errors.push({
           path: 'root.version',
-          message: 'Version must be a valid semver string or number',
+          message: '版本号必须是有效的 SemVer 字符串或数字',
           severity: 'error'
         });
       }

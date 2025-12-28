@@ -1,6 +1,6 @@
 {
   "productName": "easyformatter",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "identifier": "com.easyformatter.client",
   "build": {
     "beforeDevCommand": "npm run dev --prefix ui",

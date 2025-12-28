@@ -1,21 +1,26 @@
 <template>
   <div class="sidebar" @contextmenu.prevent="showGlobalContextMenu">
     <div class="sidebar-header">
-      <div class="search-box">
-        <n-input 
-          v-model:value="searchQuery" 
-          placeholder="" 
-          size="small"
-          clearable
-        >
-          <template #prefix>
-            <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"/></svg></n-icon>
-          </template>
-        </n-input>
+      <div class="header-row">
+        <div class="search-box">
+          <n-input 
+            v-model:value="searchQuery" 
+            placeholder="" 
+            size="small"
+            clearable
+          >
+            <template #prefix>
+              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"/></svg></n-icon>
+            </template>
+          </n-input>
+        </div>
+        <n-button quaternary circle size="small" @click="manualSync" title="同步文件状态">
+          <template #icon><n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M320 146s24.36-12-64-12a160 160 0 10160 160" fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 58l80 80-80 80"/></svg></n-icon></template>
+        </n-button>
       </div>
     </div>
 
-    <div class="file-list" v-if="filteredFiles.length > 0">
+    <TransitionGroup name="list" tag="div" class="file-list" v-if="filteredFiles.length > 0">
       <div 
         v-for="file in filteredFiles" 
         :key="file.path" 
@@ -32,15 +37,16 @@
             <span v-if="file.size">{{ formatFileSize(file.size) }}</span>
           </div>
         </div>
-        <div class="card-path" :title="file.path">
-          {{ shortenPath(file.path, 30) }}
+        <div class="card-path-row" :title="file.path">
+          <span class="path-text">{{ shortenPath(file.path, 100) }}</span>
+          <span class="time-text" v-if="file.lastModified">{{ formatTimeAgo(file.lastModified) }}</span>
         </div>
         
         <div class="delete-btn" @click.stop="appStore.removeRecentFile(file.path)">
           <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M368 368L144 144M368 144L144 368" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg></n-icon>
         </div>
       </div>
-    </div>
+    </TransitionGroup>
 
     <div v-else class="empty-state">
       <div class="empty-icon">
@@ -67,8 +73,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
-import { NInput, NIcon, NButton, NDropdown } from 'naive-ui';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { NInput, NIcon, NButton, NDropdown, useMessage } from 'naive-ui';
 import { useAppStore } from '../../stores/app';
 import { useConfigStore } from '../../stores/config';
 import { commands } from '../../tauri';
@@ -78,12 +84,48 @@ import type { RecentFileItem } from '../../types/config';
 
 const appStore = useAppStore();
 const configStore = useConfigStore();
+const message = useMessage();
 
 const searchQuery = ref('');
 const showDropdown = ref(false);
 const x = ref(0);
 const y = ref(0);
 const selectedFile = ref<RecentFileItem | null>(null);
+
+// File Monitoring
+async function checkFiles() {
+  const files = [...appStore.recentFiles];
+  const checks = await Promise.all(files.map(async f => {
+    try {
+        const doesExist = await commands.exists(f.path);
+        return { path: f.path, exists: doesExist, name: f.name };
+    } catch (e) {
+        return { path: f.path, exists: true, name: f.name };
+    }
+  }));
+
+  for (const result of checks) {
+    if (!result.exists) {
+        appStore.removeRecentFile(result.path);
+        message.warning(`文件 ${result.name} 已被删除`, { duration: 2000 });
+    }
+  }
+}
+
+function manualSync() {
+    checkFiles();
+    message.success('已同步文件列表');
+}
+
+let timer: any;
+onMounted(() => {
+    checkFiles();
+    timer = setInterval(checkFiles, 300000); // 5 minutes polling
+});
+
+onUnmounted(() => {
+    if (timer) clearInterval(timer);
+});
 
 async function openFile() {
   const path = await commands.pickFile();
@@ -99,7 +141,19 @@ const filteredFiles = computed(() => {
 });
 
 async function open(path: string) {
+  const name = path.split(/[/\\]/).pop() || path;
+  const tab = appStore.ensureTab(path, name);
+  // Commit current active buffer to its tab
+  const active = appStore.openTabs.find(t => t.id === appStore.activeTabId);
+  if (active) {
+    active.cachedText = configStore.rawText;
+    active.isDirty = configStore.isDirty;
+  }
+  // Activate new tab and load content
+  appStore.setActive(tab.id);
   await configStore.loadFile(path);
+  tab.cachedText = configStore.rawText;
+  tab.isDirty = false;
 }
 
 const currentContextMenuOptions = ref<any[]>([]);
@@ -187,12 +241,15 @@ async function handleSelect(key: string) {
   gap: 8px;
 }
 
-.file-ops {
+.header-row {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .search-box {
-  width: 100%;
+  flex: 1;
 }
 
 .file-list {
@@ -202,6 +259,19 @@ async function handleSelect(key: string) {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* List Transitions */
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.2s ease;
+}
+
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
 }
 
 .file-card {
@@ -229,22 +299,24 @@ async function handleSelect(key: string) {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .file-name {
-  font-weight: 600;
   font-size: 13px;
-  color: #333;
+  color: var(--n-text-color);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 65%;
+  flex: 1;
+  margin-right: 8px;
 }
 
 .file-meta {
   font-size: 11px;
   color: #999;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
@@ -252,12 +324,29 @@ async function handleSelect(key: string) {
   margin: 0 4px;
 }
 
-.card-path {
-  font-size: 11px;
-  color: #888;
+.card-path-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Roboto', sans-serif;
+  font-size: 12px;
+  color: #999;
+  width: 100%;
+}
+
+.path-text {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-right: 8px;
+  direction: ltr;
+}
+
+.time-text {
+  flex-shrink: 0;
+  color: #888;
+  font-size: 12px;
 }
 
 .delete-btn {

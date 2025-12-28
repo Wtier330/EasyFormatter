@@ -4,8 +4,21 @@ import type { RecentFileItem } from '../types/config';
 
 const STORAGE_KEY = 'easy-formatter-app-state';
 
+export type TabType = 'file' | 'scratch';
+export type TabDoc = { 
+  id: string; 
+  type: TabType;
+  path: string | null; 
+  name: string; 
+  cachedText?: string; 
+  originalText?: string; 
+  isDirty?: boolean;
+  createdAt?: number;
+  source?: 'paste' | 'new';
+};
+
 export const useAppStore = defineStore('app', () => {
-  // Load from storage
+  // 从存储加载
   const savedState = localStorage.getItem(STORAGE_KEY);
   let initialState: any = {};
   try {
@@ -19,7 +32,7 @@ export const useAppStore = defineStore('app', () => {
   const previewRatio = ref(initialState.previewRatio || 0.45);
   const favorites = ref<string[]>(initialState.favorites || []);
   
-  // Migration: Convert string[] to RecentFileItem[]
+  // 迁移：将 string[] 转换为 RecentFileItem[]
   const rawRecents = initialState.recentFiles || [];
   const recentFiles = ref<RecentFileItem[]>(
     rawRecents.map((item: any) => {
@@ -30,13 +43,38 @@ export const useAppStore = defineStore('app', () => {
     })
   );
 
-  // New settings
+  // 新增设置
   const wordWrap = ref(initialState.wordWrap ?? false);
-  const showRunLog = ref(initialState.showRunLog ?? false);
   const indentSize = ref(initialState.indentSize ?? 2);
   const fontSize = ref(initialState.fontSize ?? 14);
+  const scratchClosePrompt = ref(initialState.scratchClosePrompt ?? true);
+  const lastExportPath = ref<string>(initialState.lastExportPath || '');
 
-  // Triggers for Expand/Collapse (watched by JsonTree)
+  // 标签页
+  const openTabs = ref<TabDoc[]>(initialState.openTabs?.map((t: any) => ({
+    ...t,
+    type: t.type || 'file' // 迁移：如果缺失则默认为 file
+  })) || []);
+  const activeTabId = ref<string>(initialState.activeTabId || '');
+
+  // 如果为空则初始化临时标签页
+  if (openTabs.value.length === 0) {
+    const tab = {
+      id: `scratch-${Date.now()}`,
+      type: 'scratch' as const,
+      path: null,
+      name: '未命名',
+      cachedText: '',
+      originalText: '',
+      isDirty: false,
+      createdAt: Date.now(),
+      source: 'new' as const
+    };
+    openTabs.value.push(tab);
+    activeTabId.value = tab.id;
+  }
+
+  // 展开/折叠触发器 (由 JsonTree 监听)
   const triggerExpand = ref(0);
   const triggerCollapse = ref(0);
 
@@ -48,8 +86,11 @@ export const useAppStore = defineStore('app', () => {
     triggerCollapse.value++;
   }
 
-  // Persist
-  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, showRunLog, indentSize, fontSize], () => {
+  // 持久化
+  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, indentSize,
+    fontSize,
+    scratchClosePrompt, lastExportPath,
+    openTabs, activeTabId], () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       theme: theme.value,
       sidebarWidth: sidebarWidth.value,
@@ -57,9 +98,12 @@ export const useAppStore = defineStore('app', () => {
       recentFiles: recentFiles.value,
       favorites: favorites.value,
       wordWrap: wordWrap.value,
-      showRunLog: showRunLog.value,
       indentSize: indentSize.value,
-      fontSize: fontSize.value
+      fontSize: fontSize.value,
+      scratchClosePrompt: scratchClosePrompt.value,
+      lastExportPath: lastExportPath.value,
+      openTabs: openTabs.value,
+      activeTabId: activeTabId.value
     }));
   }, { deep: true });
 
@@ -88,8 +132,63 @@ export const useAppStore = defineStore('app', () => {
     wordWrap.value = !wordWrap.value;
   }
 
-  function toggleRunLog() {
-    showRunLog.value = !showRunLog.value;
+  // 标签页操作
+  function ensureTab(path: string, name?: string): TabDoc {
+    const exist = openTabs.value.find(t => t.path === path);
+    if (exist) return exist;
+    const id = path;
+    const tab: TabDoc = { 
+      id, 
+      type: 'file',
+      path, 
+      name: name || (path.split(/[/\\]/).pop() || 'untitled'), 
+      cachedText: undefined, 
+      isDirty: false 
+    };
+    openTabs.value.push(tab);
+    return tab;
+  }
+
+  function createScratchTab(content: string = '', source: 'new' | 'paste' = 'new'): TabDoc {
+    const timestamp = Date.now();
+    const count = openTabs.value.filter(t => t.type === 'scratch').length + 1;
+    const id = `scratch-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const tab: TabDoc = {
+      id,
+      type: 'scratch',
+      path: null,
+      name: `临时-${count}`,
+      cachedText: content,
+      originalText: '', // scratch starts dirty usually if pasted, or empty
+      isDirty: !!content,
+      createdAt: timestamp,
+      source
+    };
+    
+    openTabs.value.push(tab);
+    return tab;
+  }
+  
+  function setActive(id: string) {
+    activeTabId.value = id;
+  }
+  function updateTabDirtyByPath(path: string, dirty: boolean, cachedText?: string) {
+    const t = openTabs.value.find(x => x.path === path);
+    if (t) {
+      t.isDirty = dirty;
+      if (cachedText !== undefined) t.cachedText = cachedText;
+    }
+  }
+  function updateTabDirtyById(id: string, dirty: boolean, cachedText?: string) {
+    const t = openTabs.value.find(x => x.id === id);
+    if (t) {
+      t.isDirty = dirty;
+      if (cachedText !== undefined) t.cachedText = cachedText;
+    }
+  }
+  function removeTab(id: string) {
+    openTabs.value = openTabs.value.filter(t => t.id !== id);
   }
 
   return {
@@ -99,16 +198,26 @@ export const useAppStore = defineStore('app', () => {
     recentFiles,
     favorites,
     wordWrap,
-    showRunLog,
+    showRunLog: undefined, // 已移除
     indentSize,
     fontSize,
+    scratchClosePrompt,
+    lastExportPath,
     triggerExpand,
     triggerCollapse,
+    openTabs,
+    activeTabId,
     addRecentFile,
     removeRecentFile,
     toggleWordWrap,
-    toggleRunLog,
+    toggleRunLog: undefined, // 已移除
     requestExpand,
-    requestCollapse
+    requestCollapse,
+    ensureTab,
+    createScratchTab,
+    setActive,
+    updateTabDirtyByPath,
+    updateTabDirtyById,
+    removeTab
   };
 });

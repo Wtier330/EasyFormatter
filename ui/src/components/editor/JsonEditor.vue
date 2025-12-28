@@ -1,140 +1,168 @@
 <template>
   <div class="editor-wrapper">
-    <!-- Line Numbers -->
-    <div 
-      class="line-numbers" 
-      ref="lineNumbersRef" 
-      :style="{ paddingTop: padding + 'px', fontSize: appStore.fontSize + 'px' }"
-    >
-      <div v-for="n in lineCount" :key="n" class="line-num" :class="{ active: currentLine === n }">
-        {{ n }}
-      </div>
-    </div>
-
-    <!-- Editor -->
-    <div class="editor-main">
-      <n-input
-        ref="inputInst"
-        v-model:value="content"
-        type="textarea"
-        placeholder="请输入或粘贴 JSON..."
-        :resizable="false"
-        :bordered="false"
-        class="editor-input"
-        :class="{ 'no-wrap': !appStore.wordWrap }"
-        :style="{ fontSize: appStore.fontSize + 'px' }"
-        @input="onInput"
-        @click="updateCursor"
-        @keyup="updateCursor"
-        @scroll="syncScroll" 
-      />
-    </div>
+    <div class="editor-container" ref="container"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
-import { NInput } from 'naive-ui';
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import * as monaco from 'monaco-editor';
+import { debounce } from '../../utils/debounce';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
 
-const inputInst = ref<any>(null);
-const lineNumbersRef = ref<HTMLElement | null>(null);
-const textareaEl = ref<HTMLTextAreaElement | null>(null);
+const container = ref<HTMLElement | null>(null);
+let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+const modelMap = new Map<string, monaco.editor.ITextModel>();
 
-const content = computed({
-  get: () => configStore.rawText,
-  set: (val) => {
-    configStore.updateText(val);
-    updateCursor();
+function getOrCreateModel(id: string, initialText: string): monaco.editor.ITextModel {
+  if (modelMap.has(id)) {
+    return modelMap.get(id)!;
   }
-});
+  const model = monaco.editor.createModel(initialText, 'json');
+  modelMap.set(id, model);
+  return model;
+}
 
-const lineCount = computed(() => content.value.split('\n').length);
-const currentLine = ref(1);
-const padding = 12; // Match textarea padding
+function createEditor() {
+  if (!container.value) return;
+  
+  // Initialize with active tab or default
+  const activeId = appStore.activeTabId;
+  const initialText = configStore.rawText || '';
+  const model = getOrCreateModel(activeId || 'default', initialText);
 
-// Setup scroll sync and element capture
-onMounted(() => {
-  // NInput renders a div wrapper, then textarea. We need to find the textarea.
-  // Using a slight delay to ensure DOM is ready
-  setTimeout(() => {
-    const el = inputInst.value?.$el?.querySelector('textarea');
-    if (el) {
-      textareaEl.value = el;
-      el.addEventListener('scroll', syncScroll);
-      el.addEventListener('click', updateCursor);
-      el.addEventListener('keyup', updateCursor);
-      // Init cursor
-      updateCursor();
+  editor = monaco.editor.create(container.value, {
+    model,
+    language: 'json',
+    automaticLayout: true,
+    fontSize: appStore.fontSize,
+    wordWrap: appStore.wordWrap ? 'on' : 'off',
+    minimap: { enabled: false },
+    smoothScrolling: false,
+    scrollBeyondLastLine: false,
+    renderWhitespace: 'selection',
+    largeFileOptimizations: true,
+    rulers: [],
+    theme: 'vs',
+    lineNumbers: 'on',
+    cursorSmoothCaretAnimation: 'off',
+    stickyScroll: { enabled: false },
+    accessibilitySupport: 'off',
+    formatOnType: false,
+    formatOnPaste: false,
+    suggestOnTriggerCharacters: false,
+    wordBasedSuggestions: 'off'
+  });
+
+  const applyChange = debounce(() => {
+    // Sync current model content to store
+    // Only if the current model matches the active tab (sanity check)
+    const currentModel = editor?.getModel();
+    if (currentModel) {
+       const text = currentModel.getValue();
+       // Only update configStore if it's the active tab
+       // (Though editor only shows active tab, so this is implicit)
+       configStore.updateText(text);
+       
+       // Also update the cache for the active tab immediately
+       if (appStore.activeTabId) {
+         appStore.updateTabDirtyById(appStore.activeTabId, true, text);
+       }
     }
-  }, 100);
+  }, 150);
+
+  editor.onDidChangeModelContent(applyChange);
+  editor.onDidChangeCursorPosition((e) => {
+    const pos = e.position;
+    configStore.cursorPos = { line: pos.lineNumber, col: pos.column };
+  });
+}
+
+onMounted(() => {
+  createEditor();
 });
 
-function syncScroll(e: Event) {
-  if (lineNumbersRef.value && e.target instanceof Element) {
-    lineNumbersRef.value.scrollTop = (e.target as Element).scrollTop;
+onBeforeUnmount(() => {
+  editor?.dispose();
+  modelMap.forEach(model => model.dispose());
+  modelMap.clear();
+});
+
+// 监听活动标签页以切换模型
+watch(() => appStore.activeTabId, (newId) => {
+  if (!editor || !newId) return;
+  
+  // 如果模型不存在，尝试从 store 查找内容
+  // 我们期望标签页在 openTabs 中，并且如果已加载则有 cachedText
+  const tab = appStore.openTabs.find(t => t.id === newId);
+  const text = tab?.cachedText ?? configStore.rawText ?? '';
+  
+  const model = getOrCreateModel(newId, text);
+  if (editor.getModel() !== model) {
+    editor.setModel(model);
   }
-}
+});
 
-function updateCursor() {
-  if (!textareaEl.value) return;
-  const val = textareaEl.value.value;
-  const sel = textareaEl.value.selectionStart;
-  
-  // Calculate line number
-  const before = val.substring(0, sel);
-  const line = before.split('\n').length;
-  currentLine.value = line;
-  
-  // Calculate column
-  const lastNewLine = before.lastIndexOf('\n');
-  const col = sel - lastNewLine;
-  
-  // Update store (we might need to add this to config store if we want to show in status bar)
-  // For now, we just track locally for line highlighting
-  // TODO: Emit or store cursor pos for status bar
-  configStore.cursorPos = { line, col };
-}
-
-function onInput() {
-  // Auto scroll to cursor if needed? Usually browser handles it.
-}
-
-// Expose locate function
-const locate = async (key: string) => {
-  if (!textareaEl.value) return;
-  
-  const text = content.value;
-  const index = text.indexOf(`"${key}"`); // Simple search for key
-  if (index >= 0) {
-    textareaEl.value.focus();
-    textareaEl.value.setSelectionRange(index, index + key.length + 2);
-    
-    // Scroll into view - crude calculation
-    const before = text.substring(0, index);
-    const line = before.split('\n').length;
-    const lineHeight = 22; // approx 14px * 1.6
-    const top = (line - 1) * lineHeight;
-    
-    textareaEl.value.scrollTop = Math.max(0, top - 100); // Center slightly
-    
-    // Flash effect?
-    // Not easy with native textarea without overlay. Selection is good enough.
+// 清理已关闭的标签页
+watch(() => appStore.openTabs, (tabs) => {
+  const currentIds = new Set(tabs.map(t => t.id));
+  for (const [id, model] of modelMap.entries()) {
+    if (id !== 'default' && !currentIds.has(id)) {
+      model.dispose();
+      modelMap.delete(id);
+    }
   }
-};
+}, { deep: true });
 
+// 响应外部文本变化 (例如：格式化/压缩/加载)
+watch(() => configStore.rawText, (text) => {
+  const currentModel = editor?.getModel();
+  if (currentModel && text !== currentModel.getValue()) {
+    // 仅在文本真正改变时更新 (避免循环)
+    // 这处理 "格式化", "压缩", 和 "文件加载"
+    currentModel.setValue(text);
+  }
+});
+
+// 字体大小和换行更新
+watch(() => appStore.fontSize, (size) => {
+  editor?.updateOptions({ fontSize: size });
+});
+watch(() => appStore.wordWrap, (wrap) => {
+  editor?.updateOptions({ wordWrap: wrap ? 'on' : 'off' });
+});
+
+// 定位请求：选中并展示
 watch(() => configStore.locateRequest, (key) => {
-  if (key) {
-    locate(key);
-    configStore.locateRequest = null; // Reset
+  const currentModel = editor?.getModel();
+  if (!key || !editor || !currentModel) return;
+  const matches = currentModel.findMatches(`\"${key}\"`, true, false, false, null, false);
+  if (matches.length) {
+    const range = matches[0].range;
+    editor.setSelection(range);
+    editor.revealRangeInCenter(range);
   }
+  configStore.locateRequest = null;
 });
 
-defineExpose({ locate });
+// 粘贴请求：在光标处插入文本
+watch(() => configStore.pasteRequest, (text) => {
+  if (!text || !editor) return;
+  const position = editor.getPosition();
+  if (position) {
+    editor.executeEdits('paste', [{
+      range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+      text: text,
+      forceMoveMarkers: true
+    }]);
+    editor.focus();
+  }
+  configStore.pasteRequest = null;
+});
 </script>
 
 <style scoped>
@@ -145,56 +173,7 @@ defineExpose({ locate });
   position: relative;
   background-color: #fff;
 }
-
-.line-numbers {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 40px;
-  background-color: #f5f7fa;
-  border-right: 1px solid #eee;
-  padding: 12px 0;
-  overflow: hidden;
-  user-select: none;
-  text-align: right;
-  color: #999;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  z-index: 10;
-}
-
-.editor-main {
+.editor-container {
   flex: 1;
-  overflow: hidden;
-  margin-left: 40px;
-  display: flex;
-  flex-direction: column;
-}
-
-.editor-input {
-  flex: 1;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-}
-
-/* Deep selector for Naive UI textarea to control height */
-:deep(.n-input-wrapper),
-:deep(.n-input__textarea-el) {
-  height: 100% !important;
-}
-
-.line-num {
-  padding-right: 8px;
-  line-height: 1.5;
-  height: 1.5em; /* Fallback */
-}
-.line-num.active {
-  color: #333;
-  font-weight: bold;
-  background-color: #e6f7ff;
-}
-
-.no-wrap :deep(textarea) {
-  white-space: pre !important;
-  overflow-x: auto !important;
 }
 </style>

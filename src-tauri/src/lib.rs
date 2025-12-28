@@ -1,7 +1,7 @@
 pub mod core;
 pub mod commands;
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+// 了解更多关于 Tauri 命令的信息，请访问 https://tauri.app/v1/guides/features/command
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,7 +17,6 @@ pub fn run() {
             commands::read_text,
             commands::write_text,
             commands::reveal_in_explorer,
-            commands::run_decrypt,
             commands::open_devtools
         ])
         .run(tauri::generate_context!())

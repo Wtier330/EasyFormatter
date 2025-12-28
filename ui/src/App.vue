@@ -1,6 +1,6 @@
 <template>
   <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
-    <n-message-provider>
+    <n-message-provider :container-style="{ top: '40px' }">
       <n-notification-provider>
         <n-dialog-provider>
           <AppShell />
@@ -15,20 +15,22 @@ import { computed, onMounted } from 'vue';
 import { darkTheme, zhCN, dateZhCN, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui';
 import AppShell from './components/layout/AppShell.vue';
 import { useAppStore } from './stores/app';
+import { useConfigStore } from './stores/config';
 // import { events, commands } from './tauri';
-// import { useConfigStore } from './stores/config';
 
 const appStore = useAppStore();
-// const configStore = useConfigStore();
+const configStore = useConfigStore();
 
 const theme = computed(() => appStore.theme === 'dark' ? darkTheme : null);
 
 onMounted(() => {
+  configStore.startMonitoring();
+  
   // events.onCloseRequested(async () => {
   //   if (configStore.isDirty) {
   //     // In a real scenario, this would need Rust side interception to be effective blocking.
   //     // Here we provide the notification.
-  //     await commands.showError('有未保存的更改！请保存或丢弃。');
+  //     // await commands.showError('有未保存的更改！请保存或丢弃。');
   //   }
   // });
 });
