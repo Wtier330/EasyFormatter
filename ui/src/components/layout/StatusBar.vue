@@ -33,8 +33,6 @@
       <div 
         class="status-item" 
         :class="{ running: runStore.isRunning }"
-        @click="appStore.showRunLog = !appStore.showRunLog"
-        style="cursor: pointer"
       >
         <span v-if="runStore.isRunning">运行中...</span>
         <span v-else>就绪</span>
@@ -60,12 +58,10 @@ import { computed } from 'vue';
 import { NIcon } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useRunStore } from '../../stores/run';
-import { useAppStore } from '../../stores/app';
 import { shortenPath } from '../../utils/path';
 
 const configStore = useConfigStore();
 const runStore = useRunStore();
-const appStore = useAppStore();
 
 const hasErrors = computed(() => !!configStore.parseError || configStore.validationErrors.length > 0);
 

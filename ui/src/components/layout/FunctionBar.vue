@@ -81,14 +81,14 @@
 </template>
 
 <script setup lang="ts">
-import { NSpace, NButton, NButtonGroup, NIcon, NSelect, useMessage } from 'naive-ui';
+import { NSpace, NButton, NButtonGroup, NIcon, NSelect, useNotification } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 import { commands } from '../../tauri';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
-const message = useMessage();
+const notification = useNotification();
 
 async function openFile() {
   const path = await commands.pickFile();
@@ -118,9 +118,17 @@ const fontOptions = [
 
 function handleValidate() {
   if (configStore.validationErrors.length === 0 && !configStore.parseError) {
-    message.success('校验通过：格式正确且符合业务规则');
+    notification.success({
+      title: '校验通过',
+      content: '格式正确且符合业务规则',
+      duration: 3000
+    });
   } else {
-    message.error(`校验失败：发现 ${configStore.validationErrors.length + (configStore.parseError ? 1 : 0)} 个问题`);
+    notification.error({
+      title: '校验失败',
+      content: `发现 ${configStore.validationErrors.length + (configStore.parseError ? 1 : 0)} 个问题`,
+      duration: 5000
+    });
   }
 }
 </script>

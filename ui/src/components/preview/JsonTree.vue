@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, defineExpose, watch } from 'vue';
+import { computed, ref, defineExpose, watch, provide } from 'vue';
 import { NIcon } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
@@ -27,6 +27,29 @@ import JsonNode from './JsonNode.vue';
 const configStore = useConfigStore();
 const appStore = useAppStore();
 const expandLevel = ref(1); // 0=none, 999=all
+
+// Persistent expansion state
+const expandedPaths = ref(new Set<string>(['root']));
+
+function toggleExpansion(path: string, expanded: boolean) {
+  if (expanded) {
+    expandedPaths.value.add(path);
+  } else {
+    expandedPaths.value.delete(path);
+  }
+}
+
+provide('treeState', {
+  expandedPaths,
+  toggleExpansion
+});
+
+// Reset state when file changes
+watch(() => configStore.currentFilePath, () => {
+  expandedPaths.value.clear();
+  expandedPaths.value.add('root');
+  expandLevel.value = 1;
+});
 
 const treeData = computed(() => {
   return configStore.lastValidConfig;

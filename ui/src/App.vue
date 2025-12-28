@@ -1,16 +1,18 @@
 <template>
   <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
     <n-message-provider>
-      <n-dialog-provider>
-        <AppShell />
-      </n-dialog-provider>
+      <n-notification-provider>
+        <n-dialog-provider>
+          <AppShell />
+        </n-dialog-provider>
+      </n-notification-provider>
     </n-message-provider>
   </n-config-provider>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { darkTheme, zhCN, dateZhCN, NConfigProvider, NMessageProvider, NDialogProvider } from 'naive-ui';
+import { darkTheme, zhCN, dateZhCN, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui';
 import AppShell from './components/layout/AppShell.vue';
 import { useAppStore } from './stores/app';
 // import { events, commands } from './tauri';

@@ -3,7 +3,7 @@
     <!-- Show RunLog if active, otherwise show Tree -->
     <div class="content-wrapper">
       <div v-show="!appStore.showRunLog" class="pane-content">
-        <JsonTree class="tree-area" ref="jsonTreeRef" />
+        <JsonTree class="tree-area" ref="jsonTreeRef" :style="{ '--code-font-size': appStore.fontSize + 'px' }" />
         <ErrorsPanel v-if="hasErrors" />
       </div>
       
