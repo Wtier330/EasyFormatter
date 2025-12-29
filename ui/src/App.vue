@@ -1,6 +1,6 @@
 <template>
   <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
-    <n-message-provider :container-style="{ top: '40px' }">
+    <n-message-provider :container-style="{ top: '48px', padding: '12px' }">
       <n-notification-provider>
         <n-dialog-provider>
           <AppShell />

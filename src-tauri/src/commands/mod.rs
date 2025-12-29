@@ -40,6 +40,11 @@ pub fn write_text(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn file_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[tauri::command]
 pub fn reveal_in_explorer(path: String) -> Result<(), String> {
     // 在 Windows 上使用 explorer.exe 打开定位
     #[cfg(target_os = "windows")]

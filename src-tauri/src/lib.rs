@@ -16,6 +16,7 @@ pub fn run() {
             commands::save_text_file,
             commands::read_text,
             commands::write_text,
+            commands::file_exists,
             commands::reveal_in_explorer,
             commands::open_devtools
         ])

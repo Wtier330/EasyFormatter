@@ -94,6 +94,7 @@ const selectedFile = ref<RecentFileItem | null>(null);
 
 // File Monitoring
 async function checkFiles() {
+  console.log('[SidebarFiles] Checking file existence...');
   const files = [...appStore.recentFiles];
   const checks = await Promise.all(files.map(async f => {
     try {
@@ -104,12 +105,16 @@ async function checkFiles() {
     }
   }));
 
+  let removedCount = 0;
   for (const result of checks) {
     if (!result.exists) {
+        console.log(`[SidebarFiles] File missing: ${result.path}`);
         appStore.removeRecentFile(result.path);
         message.warning(`文件 ${result.name} 已被删除`, { duration: 2000 });
+        removedCount++;
     }
   }
+  console.log(`[SidebarFiles] Check complete. Removed ${removedCount} files.`);
 }
 
 function manualSync() {

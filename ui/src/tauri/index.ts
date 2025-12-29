@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open as dialogOpen, save as dialogSave, message } from '@tauri-apps/plugin-dialog';
-import { exists, stat, watch } from '@tauri-apps/plugin-fs';
+import { stat, watch } from '@tauri-apps/plugin-fs';
 
 // 重新导出特定命令
 export const commands = {
@@ -39,7 +39,7 @@ export const commands = {
 
   // 文件系统包装器
   exists: async (path: string) => {
-    return await exists(path);
+    return await invoke<boolean>('file_exists', { path });
   },
   
   stat: async (path: string) => {

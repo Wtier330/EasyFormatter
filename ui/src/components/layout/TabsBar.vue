@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount, h } from 'vue';
+import { ref, nextTick, onMounted, onBeforeUnmount, h, watch } from 'vue';
 import { NDropdown, useDialog, NCheckbox } from 'naive-ui';
 import Sortable from 'sortablejs';
 import { useAppStore } from '../../stores/app';
@@ -64,13 +64,22 @@ function commitActiveBuffer() {
   active.isDirty = configStore.isDirty;
 }
 
-async function activate(id: string) {
-  if (appStore.activeTabId === id) return;
-  commitActiveBuffer();
+async function loadTabContent(id: string) {
   const target = appStore.openTabs.find(t => t.id === id);
-  if (!target) return;
-  appStore.activeTabId = id;
-  const text = target.cachedText ?? (target.path ? await commands.readText(target.path) : '');
+  if (!target) {
+      configStore.setActiveBuffer(null, '', false);
+      return;
+  }
+  
+  let text = '';
+  try {
+    text = target.cachedText ?? (target.path ? await commands.readText(target.path) : '');
+  } catch (e) {
+    console.error(`[TabsBar] Failed to load content for tab ${target.name}:`, e);
+    // If read fails, maybe the file is gone? We could close it, but that might cause a loop if next one is also gone.
+    // For now, just show empty or error state.
+    text = ''; 
+  }
   
   if (target.originalText !== undefined) {
     configStore.originalText = target.originalText;
@@ -89,16 +98,19 @@ async function activate(id: string) {
   });
 }
 
+// Watch active tab changes to sync content
+watch(() => appStore.activeTabId, (newId) => {
+    loadTabContent(newId);
+});
+
+async function activate(id: string) {
+  if (appStore.activeTabId === id) return;
+  commitActiveBuffer();
+  appStore.activeTabId = id;
+}
+
 function performClose(id: string) {
-  const idx = appStore.openTabs.findIndex(t => t.id === id);
-  if (idx < 0) return;
-  const wasActive = appStore.openTabs[idx].id === appStore.activeTabId;
-  appStore.openTabs.splice(idx, 1);
-  if (wasActive) {
-    const next = appStore.openTabs[idx] || appStore.openTabs[idx - 1] || appStore.openTabs[0];
-    if (next) activate(next.id);
-    else configStore.setActiveBuffer(null, '', false);
-  }
+  appStore.removeTab(id);
 }
 
 function closeTab(id: string) {
@@ -209,7 +221,7 @@ onBeforeUnmount(() => {
   display: flex;
   height: 35px;
   background-color: #f0f0f0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #F0F0F0;
   user-select: none;
   position: relative;
 }
@@ -232,7 +244,7 @@ onBeforeUnmount(() => {
   min-width: 120px;
   max-width: 200px;
   height: 100%;
-  background-color: #e0e0e0;
+  background-color: #F0F0F0;
   border-right: 1px solid #d0d0d0;
   font-size: 12px;
   color: #666;

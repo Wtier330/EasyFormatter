@@ -102,7 +102,14 @@ export const useAppStore = defineStore('app', () => {
       fontSize: fontSize.value,
       scratchClosePrompt: scratchClosePrompt.value,
       lastExportPath: lastExportPath.value,
-      openTabs: openTabs.value,
+      openTabs: openTabs.value.map(t => {
+        // Optimization: Do not persist content for file-based tabs to avoid LocalStorage quota limit
+        // Scratch tabs need content persistence
+        if (t.type === 'file') {
+          return { ...t, cachedText: undefined, originalText: undefined };
+        }
+        return t;
+      }),
       activeTabId: activeTabId.value
     }));
   }, { deep: true });
@@ -122,10 +129,22 @@ export const useAppStore = defineStore('app', () => {
       lastModified,
       lastOpened: Date.now()
     }, ...filtered].slice(0, 20); // Keep 20
+    console.log(`[AppStore] Added recent file: ${path}, Total: ${recentFiles.value.length}`);
   }
 
   function removeRecentFile(path: string) {
+    const prevLen = recentFiles.value.length;
     recentFiles.value = recentFiles.value.filter(p => p.path !== path);
+    if (recentFiles.value.length !== prevLen) {
+        console.log(`[AppStore] Removed recent file: ${path}, Remaining: ${recentFiles.value.length}`);
+        
+        // Also remove from open tabs
+        const tab = openTabs.value.find(t => t.path === path);
+        if (tab) {
+            console.log(`[AppStore] Closing associated tab for: ${path}`);
+            removeTab(tab.id);
+        }
+    }
   }
 
   function toggleWordWrap() {
@@ -188,7 +207,23 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   function removeTab(id: string) {
-    openTabs.value = openTabs.value.filter(t => t.id !== id);
+    const idx = openTabs.value.findIndex(t => t.id === id);
+    if (idx === -1) return;
+
+    openTabs.value.splice(idx, 1);
+    
+    // If closed tab was active, switch to neighbor or create scratch
+    if (activeTabId.value === id) {
+      if (openTabs.value.length > 0) {
+        // Try next, or prev if at end
+        const newIdx = Math.min(idx, openTabs.value.length - 1);
+        activeTabId.value = openTabs.value[newIdx].id;
+      } else {
+        // No tabs left, create scratch
+        createScratchTab();
+        activeTabId.value = openTabs.value[0].id;
+      }
+    }
   }
 
   return {

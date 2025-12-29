@@ -1,10 +1,21 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { createDiscreteApi } from 'naive-ui';
 import { commands } from '../tauri';
 import { safeParse, formatJson, minifyJson } from '../utils/json';
 import { validateConfig } from '../utils/validate';
+import { detectWrapper, type WrapperDetection } from '../utils/wrapper';
 import { useAppStore } from './app';
 import type { ValidationError } from '../types/validation';
+
+const { message } = createDiscreteApi(['message'], {
+  messageProviderProps: {
+    containerStyle: {
+      top: '48px',
+      padding: '12px'
+    }
+  }
+});
 
 export const useConfigStore = defineStore('config', () => {
   const appStore = useAppStore();
@@ -23,6 +34,10 @@ export const useConfigStore = defineStore('config', () => {
   const locateRequest = ref<string | null>(null);
   const pasteRequest = ref<string | null>(null);
 
+  // Compatible Mode State
+  const isCompatibleMode = ref(false);
+  const compatibleInfo = ref<WrapperDetection>({ isWrapper: false });
+
   // Actions
   async function loadFile(path: string) {
     try {
@@ -33,8 +48,39 @@ export const useConfigStore = defineStore('config', () => {
       isDirty.value = false;
       appStore.addRecentFile(path);
       parseAndValidate(text);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      
+      const errStr = String(e);
+      let isMissing = false;
+
+      // 优先根据错误信息判断
+      if (errStr.includes('os error 2') || errStr.includes('not found') || errStr.includes('no such file')) {
+        isMissing = true;
+      } else {
+        // 二次确认：检查文件是否存在
+        try {
+            const exists = await commands.exists(path);
+            isMissing = !exists;
+        } catch (checkErr) {
+            console.error(`[ConfigStore] Error checking file existence`, checkErr);
+        }
+      }
+
+      if (isMissing) {
+          console.log(`[ConfigStore] File deleted detected: ${path}. UI notified.`);
+          appStore.removeRecentFile(path);
+          
+          // Also remove from tabs if open (in case removeRecentFile didn't catch it)
+          const tab = appStore.openTabs.find(t => t.path === path);
+          if (tab) {
+            appStore.removeTab(tab.id);
+          }
+          
+          message.warning('该文件已被删除', { duration: 2500 });
+          return;
+      }
+      
       await commands.showError(`无法读取文件: ${path}`);
     }
   }
@@ -74,7 +120,17 @@ export const useConfigStore = defineStore('config', () => {
     parseAndValidate(text);
   }
 
+  function extractWrapper() {
+    if (isCompatibleMode.value && compatibleInfo.value.extracted) {
+      updateText(compatibleInfo.value.extracted);
+    }
+  }
+
   function parseAndValidate(text: string) {
+    // Reset compatible mode
+    isCompatibleMode.value = false;
+    compatibleInfo.value = { isWrapper: false };
+
     if (!text.trim()) {
       // Handle empty content (e.g. all tabs closed or new file)
       parseError.value = null;
@@ -86,6 +142,25 @@ export const useConfigStore = defineStore('config', () => {
 
     const { data, error } = safeParse(text);
     if (error) {
+      // Standard parsing failed, try wrapper detection
+      const wrapper = detectWrapper(text);
+      if (wrapper.isWrapper && wrapper.extracted) {
+        const { data: innerData, error: innerError } = safeParse(wrapper.extracted);
+        if (!innerError) {
+          // Success! Enter compatible mode
+          parseError.value = null;
+          parsedConfig.value = innerData;
+          lastValidConfig.value = innerData;
+          
+          isCompatibleMode.value = true;
+          compatibleInfo.value = wrapper;
+          
+          const result = validateConfig(innerData);
+          validationErrors.value = result.errors;
+          return;
+        }
+      }
+
       parseError.value = error;
       // Do NOT update parsedConfig, keep lastValidConfig
     } else {
@@ -149,9 +224,12 @@ export const useConfigStore = defineStore('config', () => {
     loadFile,
     saveFile,
     updateText,
+    extractWrapper,
     format,
     minify,
     setActiveBuffer,
-    startMonitoring
+    startMonitoring,
+    isCompatibleMode,
+    compatibleInfo
   };
 });
