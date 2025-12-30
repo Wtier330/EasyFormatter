@@ -38,28 +38,63 @@
         </span>
         
         <span v-if="isOpen" class="bracket-end"></span>
+        <!-- 如果展开，不需要在这里加逗号，因为逗号在 expanded block 的末尾处理 -->
+        <!-- 如果折叠 (!isOpen)，需要在这里加逗号 -->
+        <span v-if="!isOpen && !isLast" class="comma">,</span>
       </span>
 
       <!-- Primitive -->
-      <span v-else class="value" :class="valueType" :title="String(data)" @dblclick="startEdit">
+      <span 
+        v-else 
+        class="value" 
+        :class="[valueType, { 'url-value': isUrl }]" 
+        @click.stop="startEdit"
+        @mouseenter="handleMouseEnter"
+        @mousemove="handleMouseMove"
+        @mouseleave="handleMouseLeave"
+      >
         <template v-if="editing">
           <n-input
             v-model:value="editingValue"
+            type="textarea"
+            autosize
             size="small"
             class="inline-editor"
-            @keyup.enter="commitEdit"
+            @keydown.enter.prevent="commitEdit"
+            @keydown.escape="cancelEdit"
             @blur="commitEdit"
+            ref="inputRef"
           />
         </template>
         <template v-else>
-          <template v-if="valueType === 'string'">"{{ truncatedString }}"</template>
+          <template v-if="valueType === 'string'">
+            <template v-if="isUrl">
+              "<span class="url-content">{{ data }}</span>"
+            </template>
+            <template v-else>
+              "{{ truncatedString }}"
+            </template>
+          </template>
           <template v-else>{{ String(data) }}</template>
         </template>
+        <span v-if="!isLast" class="comma">,</span>
       </span>
 
-      <!-- Comma -->
-      <span v-if="!isLast" class="comma">,</span>
+      <!-- Tooltip -->
+      <Teleport to="body">
+        <Transition name="fade">
+          <div 
+            v-if="showTooltip" 
+            class="custom-tooltip"
+            :style="tooltipStyle"
+          >
+            <pre class="tooltip-content">{{ escapedFullString }}</pre>
+          </div>
+        </Transition>
+      </Teleport>
 
+      <!-- Removed standalone Comma -->
+      
       <!-- Copy Path Icon -->
       <span 
         v-if="isHovered" 
@@ -106,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, inject } from 'vue';
+import { computed, ref, watch, inject, onBeforeUnmount, nextTick } from 'vue';
 import { copyToClipboard } from '../../utils/path';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
@@ -179,8 +214,80 @@ const objSummary = computed(() => {
 
 const truncatedString = computed(() => {
   if (typeof props.data !== 'string') return '';
-  const str = props.data;
+  let str = props.data;
+  
+  // Escape special characters for display
+  str = str
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+    .replace(/"/g, '\\"');
+    
   return str.length > 40 ? str.substring(0, 40) + '...' : str;
+});
+
+const isUrl = computed(() => {
+  if (typeof props.data !== 'string') return false;
+  const str = props.data.trim();
+  // Simple check for http/https, allowing quotes around it or not
+  return /^https?:\/\//i.test(str);
+});
+
+const escapedFullString = computed(() => {
+  if (typeof props.data !== 'string') return String(props.data);
+  return props.data
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+    .replace(/"/g, '\\"');
+});
+
+// Tooltip State
+const showTooltip = ref(false);
+const tooltipStyle = ref({ top: '0px', left: '0px' });
+let hoverTimer: any = null;
+let leaveTimer: any = null;
+
+function handleMouseEnter(e: MouseEvent) {
+  if (editing.value) return; 
+  clearTimeout(leaveTimer);
+  hoverTimer = setTimeout(() => {
+    updateTooltipPosition(e);
+    showTooltip.value = true;
+  }, 1000);
+}
+
+function handleMouseMove(e: MouseEvent) {
+  if (!showTooltip.value && !hoverTimer) return;
+  updateTooltipPosition(e);
+}
+
+function handleMouseLeave() {
+  clearTimeout(hoverTimer);
+  hoverTimer = null;
+  leaveTimer = setTimeout(() => {
+    showTooltip.value = false;
+  }, 300);
+}
+
+function updateTooltipPosition(e: MouseEvent) {
+  const x = e.clientX + 15;
+  const y = e.clientY + 15;
+  const winWidth = window.innerWidth;
+  // Prevent tooltip from going off-screen to the right
+  // Assuming max width around 500px or so, just a rough check
+  const finalX = x + 300 > winWidth ? winWidth - 320 : x;
+  tooltipStyle.value = {
+    top: `${y}px`,
+    left: `${finalX}px`
+  };
+}
+
+onBeforeUnmount(() => {
+  clearTimeout(hoverTimer);
+  clearTimeout(leaveTimer);
 });
 
 // Watch isOpen to update persistent state
@@ -207,16 +314,29 @@ function toggle() {
 
 const editing = ref(false);
 const editingValue = ref('');
+const inputRef = ref<InstanceType<typeof NInput> | null>(null);
 
 function startEdit() {
   if (isExpandable.value) return;
-  // preset without quotes for strings
+  
   if (valueType.value === 'string') {
-    editingValue.value = String(props.data);
+    // Show escaped version for editing so user sees \n as characters
+    editingValue.value = escapedFullString.value;
   } else {
     editingValue.value = String(props.data);
   }
   editing.value = true;
+  showTooltip.value = false;
+  clearTimeout(hoverTimer);
+  
+  // Auto focus
+  nextTick(() => {
+    inputRef.value?.focus();
+  });
+}
+
+function cancelEdit() {
+  editing.value = false;
 }
 
 function commitEdit() {
@@ -224,7 +344,36 @@ function commitEdit() {
   let newVal: any = editingValue.value;
   try {
     if (valueType.value === 'string') {
-      newVal = editingValue.value;
+      // User sees escaped string (e.g. "a\nb"), we need to unescape it back to raw string.
+      // We construct a valid JSON string literal and parse it.
+      // 1. Escape quotes because we wrap in quotes.
+      // 2. editingValue already contains user's desired escape sequences (like \n).
+      //    But wait, if user types \n (chars), they mean newline.
+      //    If user types \\n (chars), they mean backslash-n.
+      //    The JSON.parse approach:
+      //    If user input is: foo\nbar (chars)
+      //    We want result: foo (newline) bar.
+      //    JSON source: "foo\nbar".
+      //    So we can just wrap in quotes? 
+      //    NO. If user input has literal newline (from Enter key), we must escape it to \n.
+      //    And we must escape literal " to \".
+      
+      const jsonSource = editingValue.value
+        .replace(/"/g, '\\"')
+        // We do NOT replace \n with \\n here if the user intended to type \n as characters.
+        // Wait. If user types chars \ and n. They want newline.
+        // If I use JSON.parse, "foo\nbar" becomes newline. Correct.
+        // But what if user typed a LITERAL newline (e.g. pasted it)?
+        // "foo
+        // bar"
+        // JSON.parse("foo
+        // bar") is invalid.
+        // So literal newlines MUST be escaped to \n.
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+        
+      newVal = JSON.parse(`"${jsonSource}"`);
     } else {
       // try parse JSON literal
       newVal = JSON.parse(editingValue.value);
@@ -262,8 +411,9 @@ async function copyPath() {
 }
 
 function handleLocate() {
-  if (props.name !== undefined) {
-    configStore.locateRequest = String(props.name);
+  if (props.path) {
+    // Send full path instead of just name for accurate location
+    configStore.locateRequest = props.path;
   }
 }
 
@@ -352,14 +502,21 @@ function onLeave(el: Element) {
   cursor: pointer;
   font-style: italic;
 }
+.value {
+  border: 1px solid transparent; /* Reserve space to prevent jump */
+  padding: 0 2px;
+  border-radius: 2px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
 .value.string { color: #3ab54a; /* Green */ }
 .value.number { color: #25aae2; /* Blue */ }
 .value.boolean { color: #f15a24; /* Orange */ }
 .value.null { color: #f15a24; }
 .value:hover {
-  background-color: rgba(37,170,226,0.08);
-  border: 1px solid rgba(37,170,226,0.25);
-  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border: 1px dashed #999;
+  cursor: text;
 }
 
 .collapsible-content {
@@ -378,9 +535,58 @@ function onLeave(el: Element) {
 .action-icon:hover {
   color: #666;
 }
-.inline-editor :deep(.n-input__input-el) {
+.inline-editor :deep(.n-input__textarea-el) {
   padding: 0 4px;
-  height: 20px;
+  font-family: inherit;
   font-size: var(--code-font-size, 13px);
+  min-height: 20px;
+  line-height: 1.5;
+  white-space: pre; /* Prevent soft wrapping */
+  overflow-x: auto; /* Allow horizontal scrolling if needed */
+}
+
+.url-value {
+  /* optional wrapper style if needed */
+}
+.url-content {
+  color: #1890ff;
+  text-decoration: underline;
+  word-break: break-all; /* URL breaking strategy */
+}
+
+/* Tooltip Styles */
+.custom-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background-color: #ffffff;
+  color: #333333;
+  padding: 8px 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none; /* Don't interfere with mouse events */
+  min-width: 120px;
+  max-width: 80vw;
+  white-space: pre-wrap; /* Wrap text */
+  word-break: break-all;
+}
+
+.tooltip-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

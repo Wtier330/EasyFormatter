@@ -10,6 +10,8 @@ import * as monaco from 'monaco-editor';
 import { debounce } from '../../utils/debounce';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
+import { parsePath } from '../../utils/json';
+import { findNodeRange } from '../../utils/locator';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
@@ -137,15 +139,32 @@ watch(() => appStore.wordWrap, (wrap) => {
 });
 
 // 定位请求：选中并展示
-watch(() => configStore.locateRequest, (key) => {
+watch(() => configStore.locateRequest, (req) => {
   const currentModel = editor?.getModel();
-  if (!key || !editor || !currentModel) return;
-  const matches = currentModel.findMatches(`\"${key}\"`, true, false, false, null, false);
-  if (matches.length) {
-    const range = matches[0].range;
-    editor.setSelection(range);
-    editor.revealRangeInCenter(range);
+  if (!req || !editor || !currentModel) return;
+
+  const text = currentModel.getValue();
+  // 尝试解析为路径进行精确查找
+  const tokens = parsePath(req);
+  const rangeInfo = findNodeRange(text, tokens);
+
+  if (rangeInfo) {
+    const startPos = currentModel.getPositionAt(rangeInfo.start);
+    const endPos = currentModel.getPositionAt(rangeInfo.end);
+    const selection = new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column);
+    editor.setSelection(selection);
+    editor.revealRangeInCenter(selection);
+  } else {
+    // 降级策略：如果路径查找失败，尝试直接搜索字符串
+    // 这保持了对非标准路径或简单搜索的支持
+    const matches = currentModel.findMatches(`\"${req}\"`, true, false, false, null, false);
+    if (matches.length) {
+      const range = matches[0].range;
+      editor.setSelection(range);
+      editor.revealRangeInCenter(range);
+    }
   }
+  
   configStore.locateRequest = null;
 });
 
