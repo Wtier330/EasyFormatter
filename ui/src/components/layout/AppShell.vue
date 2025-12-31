@@ -62,8 +62,12 @@ import TabsBar from './TabsBar.vue';
 import JsonEditor from '../editor/JsonEditor.vue';
 import PreviewPanel from '../preview/PreviewPanel.vue';
 import { useAppStore } from '../../stores/app';
+import { useGlobalPaste } from '../../composables/useGlobalPaste';
+import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts';
 
 const appStore = useAppStore();
+useGlobalPaste();
+useKeyboardShortcuts();
 
 const mainArea = ref<HTMLElement | null>(null);
 const contentWrapper = ref<HTMLElement | null>(null);

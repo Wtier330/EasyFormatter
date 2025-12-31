@@ -7,7 +7,7 @@
           size="small" 
           @click="openFile" 
           class="icon-btn"
-          title="打开文件"
+          :title="openFileTitle"
           :disabled="false"
         >
           <template #icon>
@@ -19,7 +19,7 @@
           size="small" 
           @click="saveFile" 
           class="icon-btn"
-          title="保存文件"
+          :title="saveFileTitle"
           :disabled="false"
         >
           <template #icon>
@@ -34,7 +34,14 @@
           新建临时
         </n-button> -->
 
-        <n-button strong secondary size="small" @click="createFromClipboard" class="action-btn">
+        <n-button
+          strong
+          secondary
+          size="small"
+          @click="createFromClipboard"
+          class="action-btn"
+          :title="clipboardTipForNew"
+        >
           <template #icon>
             <n-icon><svg t="1766947938849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17675" width="256" height="256"><path d="M494.933333 128m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 426.666666q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-426.666666q0-42.666667 42.666667-42.666667Z" fill="#666666" p-id="17676"></path><path d="M836.266667 341.333333h-85.333334v85.333334h85.333334v341.333333h-597.333334v-341.333333h85.333334V341.333333h-85.333334a85.333333 85.333333 0 0 0-85.333333 85.333334v341.333333a85.333333 85.333333 0 0 0 85.333333 85.333333h597.333334a85.333333 85.333333 0 0 0 85.333333-85.333333v-341.333333a85.333333 85.333333 0 0 0-85.333333-85.333334z" fill="#666666" p-id="17677"></path><path d="M561.493333 701.44l131.413334-131.413333a34.133333 34.133333 0 0 0-24.32-58.026667H406.613333A34.133333 34.133333 0 0 0 384 570.026667l128 131.413333a33.706667 33.706667 0 0 0 49.493333 0z" fill="#666666" p-id="17678"></path></svg></n-icon>
           </template>
@@ -65,7 +72,7 @@
               <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect x="128" y="128" width="336" height="336" rx="57" ry="57" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="32"/><path d="M383.5 128l.5-24a56.16 56.16 0 00-56-56H112a64.19 64.19 0 00-64 64v216a56.16 56.16 0 0056 56h24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg></n-icon>
             </template>
           </n-button>
-          <n-button @click="handlePaste" title="粘贴">
+          <n-button @click="handlePaste" :title="clipboardTipForPaste">
             <template #icon>
               <n-icon><svg t="1766947775444" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11245" width="256" height="256"><path d="M469.12 80.64h128a32 32 0 0 0 32-32 32 32 0 0 0-32-32h-128a32 32 0 0 0-32 32 32 32 0 0 0 32 32zM276.48 174.08a32 32 0 0 0 32-32v-29.44a32 32 0 0 1 31.36-32 32 32 0 0 0 32-32 33.28 33.28 0 0 0-32.64-32 96.64 96.64 0 0 0-94.72 96v29.44a32 32 0 0 0 32 32zM727.68 80.64h128a32 32 0 0 0 32-32 32 32 0 0 0-32-32h-128a32 32 0 0 0-32 32 32 32 0 0 0 32 32zM976 571.52a32 32 0 0 0-32 32v128a32.64 32.64 0 0 0 32 32 32 32 0 0 0 32-32v-128a32 32 0 0 0-32-32zM912 794.88h-128a32.64 32.64 0 0 0-32 32 32 32 0 0 0 32 32h128a31.36 31.36 0 0 0 31.36-32 33.28 33.28 0 0 0-31.36-32zM1000.32 74.24A32 32 0 0 0 960 57.6a32.64 32.64 0 0 0-16.64 42.24 28.8 28.8 0 0 1 0 12.8v103.04a32.64 32.64 0 0 0 32 32 32 32 0 0 0 32-32V112.64a97.92 97.92 0 0 0-7.04-38.4zM976 312.96a32 32 0 0 0-32 32v128a32.64 32.64 0 0 0 32 32 32 32 0 0 0 32-32v-128a32 32 0 0 0-32-32z" fill="#323333" p-id="11246"></path><path d="M683.52 1006.08H112a96 96 0 0 1-96-96V259.84a96 96 0 0 1 96-96h571.52a96 96 0 0 1 96 96v650.24a96 96 0 0 1-96 96zM112 227.84a32 32 0 0 0-32 32v650.24a32 32 0 0 0 32 32h571.52a32 32 0 0 0 32-32V259.84a32 32 0 0 0-32-32z" fill="#323333" p-id="11247"></path><path d="M604.16 423.68H192a32 32 0 0 1-32-32 32 32 0 0 1 32-32h412.16a32 32 0 0 1 32 32 32.64 32.64 0 0 1-32 32zM604.16 616.96H192a32 32 0 0 1 0-64h412.16a32 32 0 0 1 0 64zM604.16 810.24H192a32 32 0 0 1-32-32 32 32 0 0 1 32-32h412.16a32.64 32.64 0 0 1 32 32 32 32 0 0 1-32 32z" fill="#323333" p-id="11248"></path></svg></n-icon>
             </template>
@@ -97,27 +104,223 @@
 </template>
 
 <script setup lang="ts">
-import { NSpace, NButton, NButtonGroup, NIcon, useNotification } from 'naive-ui';
+import { computed, h, onMounted, ref } from 'vue';
+import { NSpace, NButton, NButtonGroup, NIcon, NInput, useDialog, useNotification } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 import { commands } from '../../tauri';
+import { readClipboardWithFallback } from '../../utils/clipboard-handlers';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
 const notification = useNotification();
+const dialog = useDialog();
+
+type ClipboardPermissionState = 'granted' | 'prompt' | 'denied' | 'unknown';
+type ClipboardReadUse = 'new' | 'paste';
+
+const clipboardSupported = ref(true);
+const clipboardSecure = ref(true);
+const clipboardPermission = ref<ClipboardPermissionState>('unknown');
+const permissionStatusRef = ref<PermissionStatus | null>(null);
+
+const CLIPBOARD_PERMISSION_SHOWN_KEY = 'easy-formatter-clipboard-permission-shown';
+
+function getClipboardReadSupported() {
+  return !!(navigator as any).clipboard?.readText;
+}
+
+function getSecureContext() {
+  return typeof window !== 'undefined' ? (window as any).isSecureContext === true : false;
+}
+
+async function refreshClipboardPermission() {
+  clipboardSupported.value = getClipboardReadSupported();
+  clipboardSecure.value = getSecureContext();
+
+  if (!clipboardSupported.value) {
+    clipboardPermission.value = 'unknown';
+    return;
+  }
+
+  const permissionsApi = (navigator as any).permissions;
+  if (!permissionsApi?.query) {
+    clipboardPermission.value = 'unknown';
+    return;
+  }
+
+  try {
+    const status: PermissionStatus = await permissionsApi.query({ name: 'clipboard-read' as any });
+    permissionStatusRef.value = status;
+    clipboardPermission.value = (status as any).state || 'unknown';
+    status.onchange = () => {
+      clipboardPermission.value = (status as any).state || 'unknown';
+    };
+  } catch {
+    clipboardPermission.value = 'unknown';
+  }
+}
+
+onMounted(() => {
+  refreshClipboardPermission();
+});
+
+function isNotAllowedError(e: unknown) {
+  const anyErr = e as any;
+  return anyErr?.name === 'NotAllowedError' || String(e).includes('NotAllowedError');
+}
+
+function openManualPasteDialog(use: ClipboardReadUse) {
+  const manualText = ref('');
+  dialog.create({
+    title: '手动粘贴',
+    content: () => h('div', { style: 'display:flex; flex-direction:column; gap: 12px;' }, [
+      h('div', { style: 'color: #666; font-size: 12px; line-height: 18px;' }, '当前无法自动读取剪贴板。你仍可在下方输入框中使用 Ctrl+V 手动粘贴。'),
+      h(NInput, {
+        type: 'textarea',
+        value: manualText.value,
+        placeholder: '在此处粘贴内容…',
+        autosize: { minRows: 6, maxRows: 14 },
+        onUpdateValue: (v: string) => manualText.value = v
+      })
+    ]),
+    positiveText: use === 'new' ? '创建临时标签' : '粘贴到编辑器',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      const text = manualText.value;
+      if (!text) {
+        notification.warning({ title: '内容为空', duration: 1500 });
+        return false;
+      }
+      if (use === 'new') {
+        const tab = appStore.createScratchTab(text, 'paste');
+        appStore.activeTabId = tab.id;
+      } else {
+        configStore.pasteRequest = text;
+      }
+      return true;
+    }
+  });
+}
+
+function openPermissionDeniedGuide(use: ClipboardReadUse, err?: unknown) {
+  dialog.create({
+    title: '剪贴板权限被拒绝',
+    content: () => h('div', { style: 'display:flex; flex-direction:column; gap: 10px; line-height: 18px;' }, [
+      h('div', { style: 'color: #333; font-size: 13px;' }, '应用需要读取剪贴板来完成“新粘/粘贴”功能。当前权限被拒绝，无法自动读取。'),
+      h('div', { style: 'color: #666; font-size: 12px;' }, '你可以：'),
+      h('div', { style: 'color: #666; font-size: 12px;' }, '1) 在系统/浏览器的站点权限中允许“剪贴板读取”后重试'),
+      h('div', { style: 'color: #666; font-size: 12px;' }, '2) 直接使用“手动粘贴”作为替代方案'),
+      err ? h('div', { style: 'color: #999; font-size: 12px; margin-top: 6px; word-break: break-all;' }, String(err)) : null
+    ].filter(Boolean)),
+    positiveText: '手动粘贴',
+    negativeText: '关闭',
+    onPositiveClick: () => {
+      openManualPasteDialog(use);
+      return true;
+    }
+  });
+}
+
+async function readClipboardTextInteractive(use: ClipboardReadUse) {
+  await refreshClipboardPermission();
+
+  if (!clipboardSupported.value) {
+    notification.warning({ title: '当前环境不支持剪贴板 API', duration: 2000 });
+    openManualPasteDialog(use);
+    return null;
+  }
+
+  if (!clipboardSecure.value) {
+    notification.warning({ title: '当前环境不是安全上下文，无法读取剪贴板', duration: 2500 });
+    openManualPasteDialog(use);
+    return null;
+  }
+
+  if (clipboardPermission.value === 'denied') {
+    openPermissionDeniedGuide(use);
+    return null;
+  }
+
+  const shown = localStorage.getItem(CLIPBOARD_PERMISSION_SHOWN_KEY) === '1';
+  if (!shown && (clipboardPermission.value === 'prompt' || clipboardPermission.value === 'unknown')) {
+    dialog.create({
+      title: '请求剪贴板权限',
+      content: () => h('div', { style: 'display:flex; flex-direction:column; gap: 10px; line-height: 18px;' }, [
+        h('div', { style: 'color: #333; font-size: 13px;' }, '需要读取剪贴板内容以创建“临时标签/粘贴到编辑器”。'),
+        h('div', { style: 'color: #666; font-size: 12px;' }, '点击“允许并读取”将触发系统/浏览器的剪贴板权限流程。若仍失败，可选择“手动粘贴”。')
+      ]),
+      positiveText: '允许并读取',
+      negativeText: '手动粘贴',
+      onPositiveClick: async () => {
+        localStorage.setItem(CLIPBOARD_PERMISSION_SHOWN_KEY, '1');
+        try {
+          const result = await readClipboardWithFallback();
+          await refreshClipboardPermission();
+          return result ? result.text : '';
+        } catch (e) {
+          await refreshClipboardPermission();
+          if (isNotAllowedError(e)) {
+            openPermissionDeniedGuide(use, e);
+            return null;
+          }
+          notification.error({ title: '无法读取剪贴板', content: String(e), duration: 3000 });
+          openManualPasteDialog(use);
+          return null;
+        }
+      },
+      onNegativeClick: () => {
+        localStorage.setItem(CLIPBOARD_PERMISSION_SHOWN_KEY, '1');
+        openManualPasteDialog(use);
+        return true;
+      }
+    });
+    return null;
+  }
+
+  try {
+    const result = await readClipboardWithFallback();
+    await refreshClipboardPermission();
+    return result ? result.text : '';
+  } catch (e) {
+    await refreshClipboardPermission();
+    if (isNotAllowedError(e)) {
+      openPermissionDeniedGuide(use, e);
+      return null;
+    }
+    notification.error({ title: '无法读取剪贴板', content: String(e), duration: 3000 });
+    openManualPasteDialog(use);
+    return null;
+  }
+}
+
+const isMac = typeof navigator !== 'undefined' && 
+  (navigator.platform.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent.toUpperCase().indexOf('MAC') >= 0);
+const ctrlOrCmd = isMac ? 'Cmd' : 'Ctrl';
+
+const openFileTitle = computed(() => `打开文件 (${ctrlOrCmd}+O)`);
+const saveFileTitle = computed(() => `保存文件 (${ctrlOrCmd}+S)`);
+
+const clipboardTipBase = computed(() => {
+  if (!clipboardSupported.value) return '当前环境不支持剪贴板 API，将改用手动粘贴';
+  if (!clipboardSecure.value) return '当前环境不是安全上下文，无法读取剪贴板，将改用手动粘贴';
+  if (clipboardPermission.value === 'denied') return '剪贴板读取权限被拒绝，点击查看解决方案';
+  if (clipboardPermission.value === 'prompt') return '可能需要授权剪贴板读取权限';
+  return '读取剪贴板';
+});
+
+const clipboardTipForNew = computed(() => `新粘：${clipboardTipBase.value}`);
+const clipboardTipForPaste = computed(() => `粘贴：${clipboardTipBase.value}`);
 
 async function createFromClipboard() {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (!text) {
-      notification.warning({ title: '剪贴板为空', duration: 2000 });
-      return;
-    }
-    const tab = appStore.createScratchTab(text, 'paste');
-    appStore.activeTabId = tab.id;
-  } catch (e) {
-    notification.error({ title: '无法读取剪贴板', content: String(e), duration: 3000 });
+  const text = await readClipboardTextInteractive('new');
+  if (text === null) return;
+  if (!text) {
+    notification.warning({ title: '剪贴板为空', duration: 2000 });
+    return;
   }
+  const tab = appStore.createScratchTab(text, 'paste');
+  appStore.activeTabId = tab.id;
 }
 
 async function openFile() {
@@ -128,7 +331,10 @@ async function openFile() {
 }
 
 async function saveFile() {
-  await configStore.saveFile();
+  const success = await configStore.saveFile();
+  if (success) {
+    notification.success({ title: '已保存', duration: 2000 });
+  }
 }
 
 async function handleExport() {
@@ -155,16 +361,12 @@ async function handleCopy() {
 }
 
 async function handlePaste() {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      // Trigger paste in editor
-      configStore.pasteRequest = text;
-    } else {
-      notification.warning({ title: '剪贴板为空', duration: 1000 });
-    }
-  } catch (e) {
-    notification.error({ title: '无法读取剪贴板', content: String(e) });
+  const text = await readClipboardTextInteractive('paste');
+  if (text === null) return;
+  if (text) {
+    configStore.pasteRequest = text;
+  } else {
+    notification.warning({ title: '剪贴板为空', duration: 1000 });
   }
 }
 </script>

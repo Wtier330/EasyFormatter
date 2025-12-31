@@ -21,3 +21,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 regex = "1"
 lazy_static = "1.4"
+tauri-plugin-clipboard-manager = "2.3.2"

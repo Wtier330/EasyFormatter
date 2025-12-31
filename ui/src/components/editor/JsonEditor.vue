@@ -57,7 +57,8 @@ function createEditor() {
     formatOnType: false,
     formatOnPaste: false,
     suggestOnTriggerCharacters: false,
-    wordBasedSuggestions: 'off'
+    wordBasedSuggestions: 'off',
+    contextmenu: false
   });
 
   const applyChange = debounce(() => {

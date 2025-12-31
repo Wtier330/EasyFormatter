@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "identifier": "com.easyformatter.client",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix ui",
+    "beforeDevCommand": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Get-NetTCPConnection -LocalPort 1420 -State Listen -ErrorAction SilentlyContinue) { try { if ((Invoke-WebRequest -UseBasicParsing -TimeoutSec 1 http://localhost:1420/).Content -match '/@vite/client') { Write-Host '[beforeDev] Vite already running on http://localhost:1420, skip starting.'; exit 0 } } catch {} ; Write-Error '[beforeDev] Port 1420 is in use but does not look like Vite. Stop the process or change port.'; exit 1 } ; npm run dev --prefix ui; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\"",
     "beforeBuildCommand": "npm run build --prefix ui",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../ui/dist"

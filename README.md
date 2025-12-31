@@ -23,6 +23,12 @@ EasyFormatter 是一款基于 Tauri + Vue 3 构建的轻量级、高性能桌面
 - **智能排序**：支持对 JSON 对象键值进行字母序递归排序 (Sort Keys)。
 - **转义处理**：一键 Stringify 转义与 Unescape 反转义。
 
+### 3. 快捷键支持 (Shortcuts)
+支持常用快捷键操作，提升编辑效率：
+- **新建文件**: `Ctrl + N` (macOS: `Cmd + N`) - 创建带时间戳命名的临时文档
+- **打开文件**: `Ctrl + O` (macOS: `Cmd + O`) - 打开本地 JSON/文本文件
+- **保存文件**: `Ctrl + S` (macOS: `Cmd + S`) - 保存当前文档更改
+
 ## 🛠 技术架构
 
 本项目采用前后端分离架构，充分利用系统原生能力与 Web 生态：

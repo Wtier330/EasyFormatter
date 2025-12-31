@@ -88,10 +88,10 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  async function saveFile() {
+  async function saveFile(): Promise<boolean> {
     if (!currentFilePath.value) {
       const path = await commands.saveFile();
-      if (!path) return; // Cancelled
+      if (!path) return false; // Cancelled
       currentFilePath.value = path;
     }
     
@@ -99,8 +99,10 @@ export const useConfigStore = defineStore('config', () => {
       await commands.writeText(currentFilePath.value, rawText.value);
       originalHash.value = await calculateHash(rawText.value);
       isDirty.value = false;
+      return true;
     } catch (e) {
       await commands.showError(`保存失败: ${e}`);
+      return false;
     }
   }
 
