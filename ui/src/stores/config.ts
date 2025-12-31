@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { createDiscreteApi } from 'naive-ui';
 import { commands } from '../tauri';
 import { safeParse, formatJson, minifyJson } from '../utils/json';
 import { validateConfig } from '../utils/validate';
 import { detectWrapper, type WrapperDetection } from '../utils/wrapper';
+import { calculateHash } from '../utils/hash';
 import { useAppStore } from './app';
 import type { ValidationError } from '../types/validation';
 
@@ -22,7 +23,7 @@ export const useConfigStore = defineStore('config', () => {
   
   const currentFilePath = ref<string | null>(null);
   const rawText = ref('');
-  const originalText = ref('');
+  const originalHash = ref('');
   const isDirty = ref(false);
   
   // Last Valid Configuration Strategy
@@ -38,13 +39,15 @@ export const useConfigStore = defineStore('config', () => {
   const isCompatibleMode = ref(false);
   const compatibleInfo = ref<WrapperDetection>({ isWrapper: false });
 
+  const EMPTY_HASH = 'da39a3ee5e6b4b0d3255bfef95601890afd80709';
+
   // Actions
   async function loadFile(path: string) {
     try {
       const text = await commands.readText(path);
       currentFilePath.value = path;
       rawText.value = text;
-      originalText.value = text;
+      originalHash.value = await calculateHash(text);
       isDirty.value = false;
       appStore.addRecentFile(path);
       parseAndValidate(text);
@@ -94,6 +97,7 @@ export const useConfigStore = defineStore('config', () => {
     
     try {
       await commands.writeText(currentFilePath.value, rawText.value);
+      originalHash.value = await calculateHash(rawText.value);
       isDirty.value = false;
     } catch (e) {
       await commands.showError(`保存失败: ${e}`);
@@ -102,19 +106,34 @@ export const useConfigStore = defineStore('config', () => {
 
   function updateText(text: string) {
     rawText.value = text;
-    isDirty.value = text !== originalText.value;
+    isDirty.value = true;
     parseAndValidate(text);
+
+    const localText = text;
+    calculateHash(localText).then(hash => {
+      // Prevent out-of-order async hash results from overriding newer edits
+      if (rawText.value !== localText) return;
+      isDirty.value = hash !== originalHash.value;
+    });
   }
   
-  function setActiveBuffer(path: string | null, text: string, dirty: boolean) {
+  function setActiveBuffer(path: string | null, text: string, dirty: boolean, hash?: string) {
     currentFilePath.value = path;
     rawText.value = text;
-    // originalText should be set by the caller (TabsBar) before calling this,
-    // or passed as an argument. But since we exposed originalText, 
-    // we can rely on caller setting it. 
-    // However, for safety, if we are loading a fresh file (dirty=false), we can sync it here.
-    if (!dirty) {
-        originalText.value = text;
+    if (hash) {
+      originalHash.value = hash;
+    } else if (!dirty) {
+      // If clean, current text is original, so calc hash
+      calculateHash(text).then(h => {
+        // Race condition check: ensure we are still on the same content
+        if (rawText.value === text) {
+          originalHash.value = h;
+        }
+      });
+    } else {
+      // Dirty but no hash provided (legacy scratch tab or missing state)
+      // Assume original was empty (standard for scratch)
+      originalHash.value = EMPTY_HASH;
     }
     isDirty.value = dirty;
     parseAndValidate(text);
@@ -209,10 +228,16 @@ export const useConfigStore = defineStore('config', () => {
     }, 30000);
   }
 
+  watch([rawText, isDirty], ([text, dirty]) => {
+    const id = appStore.activeTabId;
+    if (!id) return;
+    appStore.updateTabDirtyById(id, dirty, text);
+  }, { flush: 'sync' });
+
   return {
     currentFilePath,
     rawText,
-    originalText,
+    originalHash,
     isDirty,
     parsedConfig,
     lastValidConfig,

@@ -12,6 +12,7 @@ export type TabDoc = {
   name: string; 
   cachedText?: string; 
   originalText?: string; 
+  originalHash?: string; // SHA-1 hash of the original content
   isDirty?: boolean;
   createdAt?: number;
   source?: 'paste' | 'new';
@@ -106,7 +107,7 @@ export const useAppStore = defineStore('app', () => {
         // Optimization: Do not persist content for file-based tabs to avoid LocalStorage quota limit
         // Scratch tabs need content persistence
         if (t.type === 'file') {
-          return { ...t, cachedText: undefined, originalText: undefined };
+          return { ...t, cachedText: undefined, originalText: undefined, originalHash: undefined };
         }
         return t;
       }),

@@ -153,6 +153,7 @@ async function open(path: string) {
   if (active) {
     active.cachedText = configStore.rawText;
     active.isDirty = configStore.isDirty;
+    active.originalHash = configStore.originalHash;
   }
   // Activate new tab and load content
   appStore.setActive(tab.id);

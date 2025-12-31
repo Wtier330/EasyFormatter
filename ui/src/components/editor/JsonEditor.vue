@@ -77,7 +77,10 @@ function createEditor() {
     }
   }, 150);
 
-  editor.onDidChangeModelContent(applyChange);
+  editor.onDidChangeModelContent((e) => {
+    if (e.isFlush) return;
+    applyChange();
+  });
   editor.onDidChangeCursorPosition((e) => {
     const pos = e.position;
     configStore.cursorPos = { line: pos.lineNumber, col: pos.column };

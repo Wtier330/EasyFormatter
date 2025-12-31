@@ -60,7 +60,7 @@ function commitActiveBuffer() {
   const active = appStore.openTabs.find(t => t.id === appStore.activeTabId);
   if (!active) return;
   active.cachedText = configStore.rawText;
-  active.originalText = configStore.originalText;
+  active.originalHash = configStore.originalHash;
   active.isDirty = configStore.isDirty;
 }
 
@@ -81,17 +81,7 @@ async function loadTabContent(id: string) {
     text = ''; 
   }
   
-  if (target.originalText !== undefined) {
-    configStore.originalText = target.originalText;
-  } else {
-    if (!target.isDirty) {
-       configStore.originalText = text;
-    } else {
-       configStore.originalText = ''; 
-    }
-  }
-
-  configStore.setActiveBuffer(target.path || null, text, !!target.isDirty);
+  configStore.setActiveBuffer(target.path || null, text, !!target.isDirty, target.originalHash);
   nextTick(() => {
     const el = scrollEl.value?.querySelector(`.tab-item.active`) as HTMLElement | null;
     el?.scrollIntoView({ inline: 'nearest', behavior: 'smooth' });
@@ -101,7 +91,7 @@ async function loadTabContent(id: string) {
 // Watch active tab changes to sync content
 watch(() => appStore.activeTabId, (newId) => {
     loadTabContent(newId);
-});
+}, { immediate: true });
 
 async function activate(id: string) {
   if (appStore.activeTabId === id) return;
