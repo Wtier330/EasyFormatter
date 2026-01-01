@@ -1,5 +1,5 @@
 <template>
-  <div class="tabs-bar" @wheel.prevent>
+  <div class="tabs-bar" @wheel.prevent @dblclick="onDoubleClick">
     <div class="tabs-scroll" ref="scrollEl">
       <div 
         v-for="tab in appStore.openTabs" 
@@ -49,12 +49,22 @@ import Sortable from 'sortablejs';
 import { useAppStore } from '../../stores/app';
 import { useConfigStore } from '../../stores/config';
 import { commands } from '../../tauri';
+import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts';
 
 const appStore = useAppStore();
 const configStore = useConfigStore();
 const dialog = useDialog();
 const scrollEl = ref<HTMLElement | null>(null);
 let sortable: Sortable | null = null;
+
+const { handleNew } = useKeyboardShortcuts({ registerListeners: false });
+
+function onDoubleClick(e: MouseEvent) {
+  // Prevent if clicking on a tab or its children
+  if ((e.target as HTMLElement).closest('.tab-item')) return;
+  
+  handleNew();
+}
 
 function commitActiveBuffer() {
   const active = appStore.openTabs.find(t => t.id === appStore.activeTabId);
@@ -178,6 +188,7 @@ onMounted(() => {
   
   sortable = new Sortable(scrollEl.value, {
     draggable: ".tab-item", // Explicitly specify draggable items
+    filter: ".close-btn", // Ignore drag on close button
     animation: 300, // 0.3s ease animation
     easing: "cubic-bezier(0.25, 1, 0.5, 1)",
     delay: 0,
@@ -209,11 +220,12 @@ onBeforeUnmount(() => {
 <style scoped>
 .tabs-bar {
   display: flex;
-  height: 35px;
-  background-color: #f0f0f0;
-  border-bottom: 1px solid #F0F0F0;
+  height: 36px;
+  background-color: #f0f0f0; /* Postman-like light gray background */
+  border-bottom: 1px solid #e0e0e0;
   user-select: none;
   position: relative;
+  box-sizing: border-box;
 }
 
 .tabs-scroll {
@@ -221,6 +233,8 @@ onBeforeUnmount(() => {
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
+  padding-top: 4px; /* Space for the top active border to sit nicely */
+  padding-left: 0;
 }
 
 .tabs-scroll::-webkit-scrollbar {
@@ -230,54 +244,56 @@ onBeforeUnmount(() => {
 .tab-item {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 16px; /* Wider padding like Postman */
   min-width: 120px;
   max-width: 200px;
-  height: 100%;
-  background-color: #F0F0F0;
-  border-right: 1px solid #d0d0d0;
-  font-size: 12px;
-  color: #666;
+  height: 32px; /* Matches (tabs-bar height - padding-top) */
+  background-color: transparent;
+  border-right: 1px solid transparent; /* Clean default state */
+  border-left: 1px solid transparent;
+  border-top: 2px solid transparent;
+  font-size: 13px;
+  color: #6b6b6b;
   cursor: pointer;
   position: relative;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-sizing: border-box;
+  margin-right: 0;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
 }
 
+/* Hover effect */
 .tab-item:hover {
-  background-color: #e8e8e8;
+  background-color: #e6e6e6;
+  color: #212121;
 }
 
+/* Active State - Postman Style */
 .tab-item.active {
   background-color: #fff;
-  color: #333;
-  border-bottom: 1px solid #fff;
+  color: #212121;
+  border-top: 2px solid #FF6C37; /* Postman Orange */
+  border-right: 1px solid #e0e0e0;
+  border-left: 1px solid #e0e0e0;
+  /* Cover the bottom border of the tabs-bar to merge with content */
+  margin-bottom: -1px; 
+  padding-bottom: 1px;
+  z-index: 1;
 }
 
-.tab-item.active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--tab-indicator-color, #22773e);
-  opacity: 1;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  z-index: 2;
+/* Separator lines between inactive tabs (optional, but Postman usually keeps it clean) */
+.tab-item:not(.active) {
+  border-right: 1px solid transparent; 
+}
+.tab-item:not(.active):hover {
+    background-color: #e1e1e1;
 }
 
+/* Remove the old bottom indicator */
+.tab-item.active::after,
 .tab-item::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--tab-indicator-color, #22773e);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  z-index: 2;
+  display: none;
 }
 
 .tab-name {
@@ -286,27 +302,38 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-right: 8px;
+  font-weight: 400; /* Regular weight usually */
+}
+.tab-item.active .tab-name {
+    font-weight: 500; /* Slightly bolder for active */
 }
 
 .scratch-tag {
-  color: #d03050;
-  border: 1px solid #d03050;
-  font-size: 10px;
-  padding: 0 3px;
-  border-radius: 3px;
-  margin-right: 6px;
-  height: 16px;
-  line-height: 14px;
-  display: inline-block;
-  vertical-align: text-bottom;
+  color: #FF6C37; /* Match accent color */
+  font-size: 16px;
+  margin-right: 4px;
+  line-height: 1;
+  font-weight: bold;
 }
 
 .tab-status {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.2s;
+}
+
+.tab-item:hover .tab-status,
+.tab-item.active .tab-status {
+  opacity: 1; /* Show on hover or active */
+}
+
+/* Dirty state logic - always show dot if dirty and not hovering */
+.tab-item .tab-status.dirty {
+  opacity: 1;
 }
 
 .close-btn {
@@ -314,64 +341,63 @@ onBeforeUnmount(() => {
   background: none;
   cursor: pointer;
   font-size: 14px;
-  color: #999;
-  width: 16px;
-  height: 16px;
-  line-height: 14px;
-  border-radius: 50%;
+  color: #757575;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  border-radius: 4px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .close-btn:hover {
-  background-color: rgba(0,0,0,0.1);
-  color: #333;
+  background-color: #e0e0e0;
+  color: #212121;
 }
 
-/* Dirty state logic */
+/* Dirty Indicator Style */
 .dirty-group {
   position: relative;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dirty-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #999;
+  background-color: #FF6C37; /* Orange dot */
   border: none;
-  position: absolute;
-  top: 4px;
-  left: 4px;
   pointer-events: none;
 }
 
 .dirty-close {
-  opacity: 0;
   position: absolute;
   top: 0;
   left: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-/* Show close button on hover over the whole tab or the close group */
+/* Show close button on hover over the dirty group or the tab */
 .tab-item:hover .dirty-close,
 .dirty-group:hover .dirty-close {
   opacity: 1;
 }
 
-/* Hide dot when close button is shown (via opacity overlap) */
-.tab-item:hover .dirty-indicator {
-  opacity: 0; 
+.tab-item:hover .dirty-indicator,
+.dirty-group:hover .dirty-indicator {
+  opacity: 0;
 }
 
-/* Normal close button opacity */
+/* Normal close button */
 .normal-close {
-  opacity: 0.5;
-}
-.tab-item:hover .normal-close {
-  opacity: 1;
+  opacity: 1; /* Controlled by parent .tab-status opacity */
 }
 </style>

@@ -1,14 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open as dialogOpen, save as dialogSave, message } from '@tauri-apps/plugin-dialog';
-import { stat, watch } from '@tauri-apps/plugin-fs';
+import { stat, watch, readFile, writeFile } from '@tauri-apps/plugin-fs';
 
 // 重新导出特定命令
 export const commands = {
   greet: (name: string) => invoke<string>('greet', { name }),
   
   readText: (path: string) => invoke<string>('read_text', { path }),
+  readFile: (path: string) => readFile(path),
   writeText: (path: string, content: string) => invoke<void>('write_text', { path, content }),
+  writeFile: (path: string, data: Uint8Array) => writeFile(path, data),
   
   // 如果需要，复用 json_apply 进行服务端处理
   jsonApply: (input: string, mode: 'Format' | 'Minify') => 
@@ -56,5 +58,14 @@ export const events = {
     listen('decrypt-log', (event) => callback(event.payload)),
     
   onCloseRequested: (callback: () => void) => 
-    listen('tauri://close-requested', callback)
+    listen('tauri://close-requested', callback),
+
+  onFileDrop: (callback: (payload: { paths: string[], position: { x: number, y: number } }) => void) => 
+    listen('tauri://drag-drop', (event) => callback(event.payload as any)),
+
+  onFileDropHover: (callback: (payload: { paths: string[], position: { x: number, y: number } }) => void) => 
+    listen('tauri://drag-enter', (event) => callback(event.payload as any)),
+
+  onFileDropCancelled: (callback: () => void) => 
+    listen('tauri://drag-leave', callback)
 };

@@ -7,14 +7,17 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import * as monaco from 'monaco-editor';
+import { useNotification } from 'naive-ui';
 import { debounce } from '../../utils/debounce';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 import { parsePath } from '../../utils/json';
 import { findNodeRange } from '../../utils/locator';
+import { transformText, type TransformMode, TRANSFORM_MODES } from '../../utils/textTransform';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
+const notification = useNotification();
 
 const container = ref<HTMLElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -53,12 +56,16 @@ function createEditor() {
     lineNumbers: 'on',
     cursorSmoothCaretAnimation: 'off',
     stickyScroll: { enabled: false },
-    accessibilitySupport: 'off',
+    accessibilitySupport: 'auto',
     formatOnType: false,
     formatOnPaste: false,
     suggestOnTriggerCharacters: false,
     wordBasedSuggestions: 'off',
-    contextmenu: false
+    contextmenu: true // Enable context menu for actions
+  });
+
+  editor.onDidFocusEditorText(() => {
+    appStore.setActivePanel('editor');
   });
 
   const applyChange = debounce(() => {
@@ -69,7 +76,7 @@ function createEditor() {
        const text = currentModel.getValue();
        // Only update configStore if it's the active tab
        // (Though editor only shows active tab, so this is implicit)
-       configStore.updateText(text);
+       configStore.updateText(text, 'editor');
        
        // Also update the cache for the active tab immediately
        if (appStore.activeTabId) {
@@ -85,6 +92,75 @@ function createEditor() {
   editor.onDidChangeCursorPosition((e) => {
     const pos = e.position;
     configStore.cursorPos = { line: pos.lineNumber, col: pos.column };
+  });
+
+  // --- Transform Logic ---
+  const handleTransform = (mode: TransformMode) => {
+    if (!editor) return;
+    const model = editor.getModel();
+    if (!model) return;
+
+    const selection = editor.getSelection();
+    const hasSelection = selection && !selection.isEmpty();
+
+    let inputText = '';
+    if (hasSelection) {
+      inputText = model.getValueInRange(selection);
+    } else {
+      inputText = model.getValue();
+    }
+
+    if (!inputText) {
+       notification.warning({ title: '没有文本可变换', duration: 2000 });
+       return;
+    }
+
+    const result = transformText(inputText, mode);
+
+    if (!result.ok) {
+      notification.error({ title: '变换失败', content: result.error, duration: 3000 });
+      return;
+    }
+
+    const output = result.output;
+
+    if (hasSelection) {
+      // Replace selection (undoable)
+      editor.executeEdits('transform', [{
+        range: selection,
+        text: output,
+        forceMoveMarkers: true
+      }]);
+      editor.focus();
+    } else {
+      // Output to Result Area (using history-aware action)
+      configStore.setTransformResult(output, TRANSFORM_MODES[mode]);
+      notification.success({ 
+        title: '变换成功', 
+        content: '未选择文本，结果已输出到右侧结果区',
+        duration: 3000 
+      });
+    }
+  };
+
+  // Register Context Menu Actions
+  const modes: TransformMode[] = ['escape', 'unescape', 'cn2unicode', 'unicode2cn'];
+  modes.forEach((mode, index) => {
+    editor!.addAction({
+      id: `transform-${mode}`,
+      label: `文本变换: ${TRANSFORM_MODES[mode]}`,
+      contextMenuGroupId: '1_transform', // Group 1 to be near top or separate
+      contextMenuOrder: index + 1,
+      run: () => handleTransform(mode)
+    });
+  });
+
+  // Watch for external requests (from Top Bar / Shortcuts)
+  watch(() => configStore.transformRequest, (mode) => {
+    if (mode && editor) {
+      handleTransform(mode as TransformMode);
+      configStore.transformRequest = null;
+    }
   });
 }
 
@@ -125,16 +201,36 @@ watch(() => appStore.openTabs, (tabs) => {
 }, { deep: true });
 
 // 响应外部文本变化 (例如：格式化/压缩/加载)
-watch(() => configStore.rawText, (text) => {
-  const currentModel = editor?.getModel();
-  if (currentModel && text !== currentModel.getValue()) {
-    // 仅在文本真正改变时更新 (避免循环)
-    // 这处理 "格式化", "压缩", 和 "文件加载"
-    currentModel.setValue(text);
-  }
-});
+  watch(() => configStore.rawText, (text) => {
+    const currentModel = editor?.getModel();
+    if (currentModel && text !== currentModel.getValue()) {
+      // 仅在文本真正改变时更新 (避免循环)
+      // 这处理 "格式化", "压缩", 和 "文件加载"
+      currentModel.setValue(text);
+      
+      // 确保 EOL 模式与 Store 一致 (特别是在文件加载后)
+      const sequence = configStore.eol === 'CRLF' 
+        ? monaco.editor.EndOfLineSequence.CRLF 
+        : monaco.editor.EndOfLineSequence.LF;
+      currentModel.setEOL(sequence);
+    }
+  });
 
-// 字体大小和换行更新
+  // EOL 切换请求
+  watch(() => configStore.eolRequest, (type) => {
+    if (!type || !editor) return;
+    const model = editor.getModel();
+    if (model) {
+      const sequence = type === 'CRLF' 
+        ? monaco.editor.EndOfLineSequence.CRLF 
+        : monaco.editor.EndOfLineSequence.LF;
+      // pushEOL 将变更推入 Undo 栈，支持撤销
+      model.pushEOL(sequence);
+    }
+    configStore.eolRequest = null;
+  });
+
+  // 字体大小和换行更新
 watch(() => appStore.fontSize, (size) => {
   editor?.updateOptions({ fontSize: size });
 });
@@ -186,6 +282,60 @@ watch(() => configStore.pasteRequest, (text) => {
   }
   configStore.pasteRequest = null;
 });
+
+// Editor Action Requests (Undo/Redo/SelectAll/Copy/Cut/Paste)
+watch(() => configStore.editorActionRequest, async (action) => {
+  if (!action || !editor) return;
+
+  switch (action) {
+    case 'undo':
+      editor.trigger('toolbar', 'undo', null);
+      break;
+    case 'redo':
+      editor.trigger('toolbar', 'redo', null);
+      break;
+    case 'selectAll':
+      editor.setSelection(editor.getModel()?.getFullModelRange() || new monaco.Range(1, 1, 1, 1));
+      editor.focus();
+      break;
+    case 'copy':
+      editor.focus();
+      const selection = editor.getSelection();
+      const model = editor.getModel();
+      if (model) {
+         const text = (selection && !selection.isEmpty()) 
+           ? model.getValueInRange(selection) 
+           : model.getValue(); // Copy all if no selection
+         
+         try {
+           await navigator.clipboard.writeText(text);
+           notification.success({ title: '已复制', duration: 1000 });
+         } catch (e) {
+           editor.trigger('toolbar', 'editor.action.clipboardCopyAction', null);
+         }
+      }
+      break;
+    case 'cut':
+      editor.focus();
+      editor.trigger('toolbar', 'editor.action.clipboardCutAction', null);
+      break;
+    case 'paste':
+      editor.focus();
+      // Try native clipboard read first
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+           editor.trigger('keyboard', 'type', { text: text });
+        }
+      } catch (e) {
+        // Fallback to editor action (might not work in all browsers due to permissions)
+        editor.trigger('toolbar', 'editor.action.clipboardPasteAction', null);
+      }
+      break;
+  }
+  
+  configStore.editorActionRequest = null;
+});
 </script>
 
 <style scoped>
@@ -195,8 +345,11 @@ watch(() => configStore.pasteRequest, (text) => {
   flex-direction: column;
   position: relative;
   background-color: #fff;
+  overflow: hidden; /* Ensure wrapper doesn't spill */
 }
 .editor-container {
   flex: 1;
+  overflow: hidden; /* Critical for Monaco to size correctly */
+  min-height: 0; /* Flexbox nested scrolling fix */
 }
 </style>

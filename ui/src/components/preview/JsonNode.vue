@@ -451,7 +451,8 @@ function onLeave(el: Element) {
   font-size: var(--code-font-size, 13px);
   line-height: 1.5;
   color: #333;
-  contain: content; /* Performance optimization */
+  min-width: 100%;
+  width: fit-content; /* Ensure container expands to fit content for scrolling */
 }
 /* ... existing styles ... */
 .node-line {
@@ -459,6 +460,9 @@ function onLeave(el: Element) {
   align-items: center;
   white-space: pre;
   cursor: default;
+}
+.node-line > * {
+  flex-shrink: 0; /* Prevent items from shrinking */
 }
 .node-line:hover {
   background-color: #f0f0f0;

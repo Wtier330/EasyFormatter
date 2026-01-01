@@ -1,13 +1,12 @@
-import { onMounted, onUnmounted, h, ref } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../stores/app';
 import { useConfigStore } from '../stores/config';
 import { commands } from '../tauri';
-import { useDialog, useNotification, NInput } from 'naive-ui';
+import { useNotification } from 'naive-ui';
 
-export function useKeyboardShortcuts() {
+export function useKeyboardShortcuts(options: { registerListeners?: boolean } = { registerListeners: true }) {
   const appStore = useAppStore();
   const configStore = useConfigStore();
-  const dialog = useDialog();
   const notification = useNotification();
 
   // Helper to detect platform
@@ -24,50 +23,22 @@ export function useKeyboardShortcuts() {
   async function handleOpen() {
     const path = await commands.pickFile();
     if (path) {
+      const tab = appStore.ensureTab(path);
+      appStore.activeTabId = tab.id;
       await configStore.loadFile(path);
     }
   }
 
   function handleNew() {
-    // YYYYMMDDHHmmss
-    const now = new Date();
-    const timestamp = now.getFullYear().toString() +
-      (now.getMonth() + 1).toString().padStart(2, '0') +
-      now.getDate().toString().padStart(2, '0') +
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0');
-      
-    const defaultName = `未命名-${timestamp}`;
-    const fileName = ref(defaultName);
-
-    dialog.create({
-      title: '新建文件',
-      content: () => h('div', { style: 'display:flex; flex-direction:column; gap: 12px;' }, [
-        h('div', { style: 'color: #666; font-size: 12px;' }, '请输入文件名：'),
-        h(NInput, {
-          value: fileName.value,
-          placeholder: '文件名',
-          autofocus: true,
-          onUpdateValue: (v) => fileName.value = v
-        })
-      ]),
-      positiveText: '创建',
-      negativeText: '取消',
-      onPositiveClick: () => {
-        const name = fileName.value.trim() || defaultName;
-        const tab = appStore.createScratchTab('', 'new');
-        tab.name = name;
-        appStore.activeTabId = tab.id;
-        
-        notification.success({
-            title: '新建成功',
-            content: `已创建文件: ${name}`,
-            duration: 3000
-        });
-        return true;
-      }
-    });
+    const tab = appStore.createScratchTab('', 'new');
+    appStore.activeTabId = tab.id;
+    
+    // Optional: Notify user implicitly by focus change or small toast
+    // notification.success({
+    //     title: '新建成功',
+    //     content: `已创建文件: ${tab.name}`,
+    //     duration: 1000
+    // });
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -94,13 +65,91 @@ export function useKeyboardShortcuts() {
       handleNew();
       return;
     }
+
+    // --- Text Transform Shortcuts ---
+    
+    // Unescape: Ctrl+Alt+Shift+E / Cmd+Opt+Shift+E
+    if (ctrlOrCmd && e.altKey && e.shiftKey && key === 'e') {
+      e.preventDefault();
+      configStore.transformRequest = 'unescape';
+      return;
+    }
+
+    // Escape: Ctrl+Alt+E / Cmd+Opt+E
+    if (ctrlOrCmd && e.altKey && !e.shiftKey && key === 'e') {
+      e.preventDefault();
+      configStore.transformRequest = 'escape';
+      return;
+    }
+
+    // Unicode -> CN: Ctrl+Alt+Shift+U / Cmd+Opt+Shift+U
+    if (ctrlOrCmd && e.altKey && e.shiftKey && key === 'u') {
+      e.preventDefault();
+      configStore.transformRequest = 'unicode2cn';
+      return;
+    }
+
+    // CN -> Unicode: Ctrl+Alt+U / Cmd+Opt+U
+    if (ctrlOrCmd && e.altKey && !e.shiftKey && key === 'u') {
+      e.preventDefault();
+      configStore.transformRequest = 'cn2unicode';
+      return;
+    }
+
+    // Undo: Ctrl+Z
+    if (ctrlOrCmd && !e.shiftKey && key === 'z') {
+      // Check if we are in Editor or Input
+      // If active element is monaco editor (which is a textarea inside usually, or contenteditable)
+      // Monaco usually stops propagation, but if it doesn't, we should check.
+      // Or if focus is on body (lost focus from Preview), we want to undo Preview.
+      
+      const active = document.activeElement;
+      const isInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+      const isMonaco = active?.closest('.monaco-editor');
+      
+      // If focused in input/textarea/monaco, let them handle undo
+      if (isInput || isMonaco) return;
+
+      e.preventDefault();
+      if (configStore.transformResult !== null) {
+         if (configStore.canUndo) configStore.undoTransform();
+      } else if (configStore.canUndoDocument) {
+         configStore.undoDocument();
+      }
+      return;
+    }
+
+    // Redo: Ctrl+Y or Ctrl+Shift+Z
+    if (ctrlOrCmd && ((!e.shiftKey && key === 'y') || (e.shiftKey && key === 'z'))) {
+      const active = document.activeElement;
+      const isInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+      const isMonaco = active?.closest('.monaco-editor');
+      
+      if (isInput || isMonaco) return;
+
+      e.preventDefault();
+      if (configStore.transformResult !== null) {
+         if (configStore.canRedo) configStore.redoTransform();
+      } else if (configStore.canRedoDocument) {
+         configStore.redoDocument();
+      }
+      return;
+    }
   }
 
-  onMounted(() => {
-    window.addEventListener('keydown', onKeyDown);
-  });
+  if (options.registerListeners) {
+    onMounted(() => {
+      window.addEventListener('keydown', onKeyDown);
+    });
 
-  onUnmounted(() => {
-    window.removeEventListener('keydown', onKeyDown);
-  });
+    onUnmounted(() => {
+      window.removeEventListener('keydown', onKeyDown);
+    });
+  }
+
+  return {
+    handleSave,
+    handleOpen,
+    handleNew
+  };
 }

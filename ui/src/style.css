@@ -2,19 +2,44 @@
   --font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
   /* Panel UI Spec */
-  --panel-border-color: #D9D9D9;
-  --panel-border-radius: 4px;
+  --panel-border-color: #e0e0e0;
+  --panel-border-radius: 0px; /* Flush */
   --panel-bg-color: #FFFFFF;
-  --panel-padding: 8px; /* 8-12px range */
+  --panel-padding: 0px;
   
   /* Splitter Spec */
-  --splitter-color-idle: #CCCCCC;
-  --splitter-color-active: #1890FF;
-  --splitter-transition: background-color 0.3s ease, border-color 0.3s ease;
+  --splitter-color-idle: #e0e0e0; /* Match border color */
+  --splitter-color-active: #FF6C37; /* Postman Orange for interaction */
+  --splitter-transition: background-color 0.2s ease;
   
   /* Active State */
-  --panel-border-active: #1890FF;
+  --panel-border-active: #FF6C37;
 }
+
+/* Global Scrollbar Styling (Webkit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cfcfcf;
+  border-radius: 5px;
+  border: 2px solid #fff; /* Creates padding effect */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 body {
   margin: 0;
   padding: 0;

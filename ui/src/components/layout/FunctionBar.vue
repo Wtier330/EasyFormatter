@@ -27,6 +27,19 @@
           </template>
         </n-button>
 
+        <n-button-group size="small">
+          <n-button @click="handleUndo" :title="undoTitle" class="icon-btn">
+            <template #icon>
+              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M424 424v-46c0-70-63-128-147-128-42 0-81 15-110 41l-2 2-3-3L83.5 211.5a10 10 0 0 0-14 0l-1 1-60 60a10 10 0 0 0 0 14l104 104a10 10 0 0 0 14 0l1-1 78.5-78.5-3-3c27 25 64 39 104 39 52 0 94-29 108-72a8 8 0 0 1 8-6h1z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M240 250h-88v-88"/></svg></n-icon>
+            </template>
+          </n-button>
+          <n-button @click="handleRedo" :title="redoTitle" class="icon-btn">
+             <template #icon>
+              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="transform: scaleX(-1);"><path d="M424 424v-46c0-70-63-128-147-128-42 0-81 15-110 41l-2 2-3-3L83.5 211.5a10 10 0 0 0-14 0l-1 1-60 60a10 10 0 0 0 0 14l104 104a10 10 0 0 0 14 0l1-1 78.5-78.5-3-3c27 25 64 39 104 39 52 0 94-29 108-72a8 8 0 0 1 8-6h1z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M240 250h-88v-88"/></svg></n-icon>
+            </template>
+          </n-button>
+        </n-button-group>
+
         <!-- <n-button strong secondary size="small" @click="createNewScratch" class="action-btn">
           <template #icon>
             <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M368 224h-112v-112c0-8.84-7.16-16-16-16s-16 7.16-16 16v112h-112c-8.84 0-16 7.16-16 16s7.16 16 16 16h112v112c0 8.84 7.16 16 16 16s16-7.16 16-16v-112h112c8.84 0 16-7.16 16-16s-7.16-16-16-16z" fill="currentColor"/></svg></n-icon>
@@ -61,6 +74,16 @@
           </template>
           压缩
         </n-button>
+
+        <n-dropdown 
+          trigger="click" 
+          :options="transformOptions" 
+          @select="handleTransformSelect"
+        >
+          <n-button strong secondary size="small" class="action-btn" title="文本变换">
+            变换 ▾
+          </n-button>
+        </n-dropdown>
       </n-space>
     </div>
     
@@ -79,33 +102,38 @@
           </n-button>
           <n-button @click="handleExport" title="导出">
             <template #icon>
-              <n-icon><svg t="1766947516935" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5838" width="256" height="256"><path d="M892.7 559.5c-26.1 0-41.8 15.7-41.8 41.8v52.2c0 88.8-5.2 156.6-167.1 156.6H349.6c-167.1 0-167.1-73.1-167.1-167.1V434.1C172.1 303.6 234.8 277.5 307.9 267h5.2c26.1 0 41.8-15.7 41.8-41.8s-15.7-41.8-41.8-41.8h-47C177.3 183.5 99 256.6 99 350.6v370.7c0 88.8 73.1 167.1 167.1 167.1h496.1c88.8 0 167.1-73.1 167.1-167.1V596c5.2-15.7-15.7-36.5-36.6-36.5z m-642.3 20.8c0 41.8 10.4 83.5 20.9 120.1 47-135.8 172.3-235 323.7-235v52.2c0 20.9 10.4 41.8 31.3 52.2 10.4 5.2 15.7 10.4 26.1 10.4 10.4 0 26.1-5.2 31.3-10.4l229.8-177.5c10.4-10.4 20.9-31.3 20.9-52.2 0-15.7-10.4-36.6-20.9-47L683.8 115.6c-10.4-10.4-26.1-10.4-36.6-10.4s-15.7 0-26.1 10.4c-20.9 10.4-31.3 31.3-31.3 52.2v57.4c-187.9 0.1-339.4 156.7-339.4 355.1z" fill="#00AA88" p-id="5839"></path></svg></n-icon>
+              <n-icon><svg t="1767248034647" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5036" width="256" height="256"><path d="M942.1 593.9c-22.6 0-41 18.3-41 41v204.8c0 22.6-18.4 41-41 41H163.8c-22.6 0-41-18.4-41-41V634.9c0-22.6-18.3-41-41-41s-41 18.3-41 41v204.8c0 67.8 55.1 122.9 122.9 122.9H860c67.8 0 122.9-55.1 122.9-122.9V634.9c0.1-22.6-18.2-41-40.8-41z" p-id="5037"></path><path d="M309.3 363L471 201.3v515.5c0 22.5 18.4 41 41 41 22.5 0 41-18.4 41-41V201.3L714.7 363c15.9 15.9 42 15.9 57.9 0 15.9-15.9 15.9-42 0-57.9L541.5 73.9c-0.2-0.2-0.3-0.4-0.4-0.5-5.7-5.7-12.7-9.3-20.1-10.9-0.2-0.1-0.5-0.2-0.7-0.2-2.7-0.5-5.4-0.8-8.1-0.8-2.7 0-5.5 0.3-8.1 0.8-0.3 0.1-0.5 0.2-0.7 0.2-7.4 1.6-14.4 5.2-20.1 10.9-0.2 0.2-0.3 0.4-0.4 0.5L251.4 305.1c-15.9 15.9-15.9 42 0 57.9 15.9 15.9 42 15.9 57.9 0z" p-id="5038"></path></svg></n-icon>
             </template>
           </n-button>
         </n-button-group>
 
-        <n-button-group size="small">
-          <n-button @click="appStore.requestExpand">
-            <template #icon>
-              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M432 320v112H320M421.8 421.77L304 304M80 192V80h112M90.2 90.23L208 208M320 80h112v112M421.77 90.2L304 208M192 432H80V320M90.23 421.8L208 304"/></svg></n-icon>
-            </template>
-            全展开
-          </n-button>
-          <n-button @click="appStore.requestCollapse">
-            <template #icon>
-              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M4 4h4v4H4zM248 80h112v112M421.77 90.2L304 208M192 432H80V320M90.23 421.8L208 304" style="display:none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M304 320v112h112M421.8 421.77L304 304M208 192V80H96M90.2 90.23L208 208M320 192h112V80M421.77 90.2L304 208M192 320H80v112M90.23 421.8L208 304"/></svg></n-icon>
-            </template>
-            全折叠
-          </n-button>
-        </n-button-group>
+        <n-button 
+          strong 
+          secondary 
+          size="small" 
+          @click="toggleExpand" 
+          class="action-btn" 
+          :title="expandTitle"
+          :aria-label="expandTitle"
+        >
+          <template #icon>
+            <n-icon>
+              <transition name="icon-scale" mode="out-in">
+                <svg v-if="!isExpanded" key="expand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M432 320v112H320M421.8 421.77L304 304M80 192V80h112M90.2 90.23L208 208M320 80h112v112M421.77 90.2L304 208M192 432H80V320M90.23 421.8L208 304"/></svg>
+                <svg v-else key="collapse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M4 4h4v4H4zM248 80h112v112M421.77 90.2L304 208M192 432H80V320M90.23 421.8L208 304" style="display:none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M304 320v112h112M421.8 421.77L304 304M208 192V80H96M90.2 90.23L208 208M320 192h112V80M421.77 90.2L304 208M192 320H80v112M90.23 421.8L208 304"/></svg>
+              </transition>
+            </n-icon>
+          </template>
+          {{ expandTitle }}
+        </n-button>
       </n-space>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue';
-import { NSpace, NButton, NButtonGroup, NIcon, NInput, useDialog, useNotification } from 'naive-ui';
+import { computed, h, onMounted, ref, watch } from 'vue';
+import { NSpace, NButton, NButtonGroup, NIcon, NInput, NDropdown, useDialog, useNotification } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 import { commands } from '../../tauri';
@@ -115,6 +143,38 @@ const configStore = useConfigStore();
 const appStore = useAppStore();
 const notification = useNotification();
 const dialog = useDialog();
+
+// Transform Options
+const transformOptions = [
+  { label: '转义 (Escape)', key: 'escape', extra: 'Ctrl+Alt+E' },
+  { label: '去转义 (Unescape)', key: 'unescape', extra: 'Ctrl+Alt+Shift+E' },
+  { label: '中文 → Unicode', key: 'cn2unicode', extra: 'Ctrl+Alt+U' },
+  { label: 'Unicode → 中文', key: 'unicode2cn', extra: 'Ctrl+Alt+Shift+U' }
+];
+
+function handleTransformSelect(key: string) {
+  configStore.transformRequest = key;
+}
+
+// Toggle Expand/Collapse Logic
+const isExpanded = ref(false);
+
+const expandTitle = computed(() => isExpanded.value ? '全折叠' : '全展开');
+
+function toggleExpand() {
+  if (isExpanded.value) {
+    appStore.requestCollapse();
+    isExpanded.value = false;
+  } else {
+    appStore.requestExpand();
+    isExpanded.value = true;
+  }
+}
+
+// Reset state when tab changes
+watch(() => appStore.activeTabId, () => {
+  isExpanded.value = false;
+});
 
 type ClipboardPermissionState = 'granted' | 'prompt' | 'denied' | 'unknown';
 type ClipboardReadUse = 'new' | 'paste';
@@ -300,6 +360,8 @@ const ctrlOrCmd = isMac ? 'Cmd' : 'Ctrl';
 
 const openFileTitle = computed(() => `打开文件 (${ctrlOrCmd}+O)`);
 const saveFileTitle = computed(() => `保存文件 (${ctrlOrCmd}+S)`);
+const undoTitle = computed(() => `撤销 (${ctrlOrCmd}+Z)`);
+const redoTitle = computed(() => `重做 (${ctrlOrCmd}+Shift+Z)`);
 
 const clipboardTipBase = computed(() => {
   if (!clipboardSupported.value) return '当前环境不支持剪贴板 API，将改用手动粘贴';
@@ -310,7 +372,31 @@ const clipboardTipBase = computed(() => {
 });
 
 const clipboardTipForNew = computed(() => `新粘：${clipboardTipBase.value}`);
-const clipboardTipForPaste = computed(() => `粘贴：${clipboardTipBase.value}`);
+const clipboardTipForPaste = computed(() => `粘贴 (${ctrlOrCmd}+V)：${clipboardTipBase.value}`);
+
+function handleUndo() {
+  if (appStore.activePanel === 'preview') {
+    if (configStore.transformResult !== null) {
+      if (configStore.canUndo) configStore.undoTransform();
+    } else {
+      if (configStore.canUndoDocument) configStore.undoDocument();
+    }
+  } else {
+    configStore.editorActionRequest = 'undo';
+  }
+}
+
+function handleRedo() {
+  if (appStore.activePanel === 'preview') {
+    if (configStore.transformResult !== null) {
+      if (configStore.canRedo) configStore.redoTransform();
+    } else {
+      if (configStore.canRedoDocument) configStore.redoDocument();
+    }
+  } else {
+    configStore.editorActionRequest = 'redo';
+  }
+}
 
 async function createFromClipboard() {
   const text = await readClipboardTextInteractive('new');
@@ -351,13 +437,8 @@ async function handleExport() {
   }
 }
 
-async function handleCopy() {
-  try {
-    await navigator.clipboard.writeText(configStore.rawText);
-    notification.success({ title: '已复制', duration: 1000 });
-  } catch (e) {
-    notification.error({ title: '复制失败', content: String(e) });
-  }
+function handleCopy() {
+  configStore.editorActionRequest = 'copy';
 }
 
 async function handlePaste() {
@@ -373,8 +454,8 @@ async function handlePaste() {
 
 <style scoped>
 .function-bar {
-  min-height: 48px;
-  margin: 8px 12px;
+  min-height: 40px;
+  margin: 0;
   padding: 4px 16px;
   display: flex;
   align-items: center;
@@ -382,8 +463,8 @@ async function handlePaste() {
   flex-wrap: wrap;
   gap: 8px;
   background-color: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  border-bottom: 1px solid #e0e0e0;
+  box-sizing: border-box;
 }
 
 .bar-left, .bar-right {
@@ -405,24 +486,47 @@ async function handlePaste() {
 .action-btn {
   min-width: 80px; /* Consistent width for main buttons */
 }
+
+/* Postman-like icon buttons */
 .icon-btn {
   width: 32px;
   height: 32px;
   padding: 0;
   border-radius: 4px;
-  border: none !important;
+  border: 1px solid transparent !important; /* Reserve space for border */
   background-color: transparent;
-  color: #666;
+  color: #6b6b6b; /* Slightly lighter gray */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .icon-btn:hover {
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: #f2f2f2;
+  color: #212121;
 }
+
 .icon-btn:active {
-  background-color: #e0e0e0;
+  background-color: #e6e6e6;
+  transform: translateY(1px);
 }
+
 .icon-btn[disabled] {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  background-color: transparent;
+}
+
+/* Icon Transition */
+.icon-scale-enter-active,
+.icon-scale-leave-active {
+  transition: all 0.2s ease;
+}
+
+.icon-scale-enter-from,
+.icon-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
 }
 </style>

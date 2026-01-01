@@ -1,5 +1,31 @@
 <template>
   <div class="sidebar" @contextmenu.prevent="showGlobalContextMenu">
+    <!-- Collapsed View -->
+    <div v-if="isCollapsed" class="collapsed-view" @click="expandSidebar">
+      <n-tooltip placement="right">
+        <template #trigger>
+          <div class="collapsed-icon">
+            <n-icon size="24"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M64 192h384M64 320h384M64 64h384c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32H64c-17.7 0-32-14.3-32-32V96c0-17.7 14.3-32 32-32z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="32"/></svg></n-icon>
+          </div>
+        </template>
+        展开侧边栏 ({{ filteredFiles.length }} 个文件)
+      </n-tooltip>
+      
+      <div class="collapsed-divider"></div>
+      
+      <!-- Quick Actions in Collapsed Mode -->
+      <n-tooltip placement="right">
+        <template #trigger>
+          <div class="collapsed-icon" @click.stop="openFile">
+             <n-icon size="20"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 176v160M336 256H176"/></svg></n-icon>
+          </div>
+        </template>
+        导入文件
+      </n-tooltip>
+    </div>
+
+    <!-- Expanded View -->
+    <template v-else>
     <div class="sidebar-header">
       <div class="header-row">
         <div class="search-box">
@@ -69,32 +95,46 @@
       @clickoutside="showDropdown = false"
       @select="handleSelect"
     />
+
+    <AboutModal v-model:show="showAbout" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
-import { NInput, NIcon, NButton, NDropdown, useMessage } from 'naive-ui';
+import { NInput, NIcon, NButton, NDropdown, useMessage, NTooltip } from 'naive-ui';
 import { useAppStore } from '../../stores/app';
 import { useConfigStore } from '../../stores/config';
 import { commands } from '../../tauri';
 import { shortenPath, copyToClipboard } from '../../utils/path';
 import { formatFileSize, formatTimeAgo } from '../../utils/format';
 import type { RecentFileItem } from '../../types/config';
+import AboutModal from '../about/AboutModal.vue';
+import { useAbout } from '../../composables/useAbout';
 
 const appStore = useAppStore();
 const configStore = useConfigStore();
 const message = useMessage();
+const { initInfo } = useAbout();
+
+const isCollapsed = computed(() => appStore.sidebarState === 'COLLAPSED');
+
+function expandSidebar() {
+  appStore.sidebarState = 'EXPANDED';
+  appStore.sidebarWidth = Math.max(appStore.lastExpandedWidth, 200);
+}
 
 const searchQuery = ref('');
 const showDropdown = ref(false);
+const showAbout = ref(false);
 const x = ref(0);
 const y = ref(0);
 const selectedFile = ref<RecentFileItem | null>(null);
 
-// File Monitoring
+// File Monitoring: Check if files still exist on disk
 async function checkFiles() {
-  console.log('[SidebarFiles] Checking file existence...');
+  // console.log('[SidebarFiles] Checking file existence...');
   const files = [...appStore.recentFiles];
   const checks = await Promise.all(files.map(async f => {
     try {
@@ -125,6 +165,7 @@ function manualSync() {
 let timer: any;
 onMounted(() => {
     checkFiles();
+    initInfo();
     timer = setInterval(checkFiles, 300000); // 5 minutes polling
 });
 
@@ -401,5 +442,44 @@ async function handleSelect(key: string) {
   font-size: 12px;
   margin-top: 5px;
   margin-bottom: 15px;
+}
+
+.collapsed-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 16px;
+  cursor: pointer;
+  background-color: #f9f9f9;
+}
+
+.collapsed-view:hover {
+  background-color: #f0f0f0;
+}
+
+.collapsed-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  border-radius: 6px;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.collapsed-icon:hover {
+  background-color: #e0e0e0;
+  color: var(--n-primary-color);
+  transform: scale(1.05);
+}
+
+.collapsed-divider {
+  width: 24px;
+  height: 1px;
+  background-color: #ddd;
+  margin: 8px 0;
 }
 </style>

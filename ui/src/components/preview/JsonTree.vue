@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, defineExpose, watch, provide } from 'vue';
+import { computed, ref, watch, provide } from 'vue';
 import { NIcon } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
@@ -86,11 +86,14 @@ defineExpose({
   display: flex;
   flex-direction: column;
   background-color: #fff;
+  overflow: hidden; /* Ensure container doesn't spill */
 }
 .tree-content {
   flex: 1;
-  overflow: auto;
+  overflow: auto; /* Enable both scrollbars */
   padding: 8px;
+  white-space: nowrap; /* Force horizontal scroll for long lines */
+  min-height: 0; /* Flexbox scroll fix */
 }
 .empty-tree {
   flex: 1;

@@ -30,19 +30,23 @@ export const useAppStore = defineStore('app', () => {
 
   const theme = ref<'light' | 'dark' | 'auto'>(initialState.theme || 'auto');
   const sidebarWidth = ref(initialState.sidebarWidth || 220);
+  const sidebarState = ref<'EXPANDED' | 'COLLAPSED'>(initialState.sidebarState || 'EXPANDED');
+  const lastExpandedWidth = ref(initialState.lastExpandedWidth || 220);
+  const isSidebarDragging = ref(false);
+
   const previewRatio = ref(initialState.previewRatio || 0.45);
-  const favorites = ref<string[]>(initialState.favorites || []);
   
-  // 迁移：将 string[] 转换为 RecentFileItem[]
-  const rawRecents = initialState.recentFiles || [];
+  const tnsRecents = initialState.recentFiles || [];
   const recentFiles = ref<RecentFileItem[]>(
-    rawRecents.map((item: any) => {
+    tnsRecents.map((item: any) => {
       if (typeof item === 'string') {
         return { path: item, name: item.split(/[/\\]/).pop() || item, lastOpened: Date.now() };
       }
       return item;
     })
   );
+  
+  const favorites = ref<string[]>(initialState.favorites || []);
 
   // 新增设置
   const wordWrap = ref(initialState.wordWrap ?? false);
@@ -57,23 +61,7 @@ export const useAppStore = defineStore('app', () => {
     type: t.type || 'file' // 迁移：如果缺失则默认为 file
   })) || []);
   const activeTabId = ref<string>(initialState.activeTabId || '');
-
-  // 如果为空则初始化临时标签页
-  if (openTabs.value.length === 0) {
-    const tab = {
-      id: `scratch-${Date.now()}`,
-      type: 'scratch' as const,
-      path: null,
-      name: '未命名',
-      cachedText: '',
-      originalText: '',
-      isDirty: false,
-      createdAt: Date.now(),
-      source: 'new' as const
-    };
-    openTabs.value.push(tab);
-    activeTabId.value = tab.id;
-  }
+  const activePanel = ref<'editor' | 'preview'>('editor');
 
   // 展开/折叠触发器 (由 JsonTree 监听)
   const triggerExpand = ref(0);
@@ -88,13 +76,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 持久化
-  watch([theme, sidebarWidth, previewRatio, recentFiles, favorites, wordWrap, indentSize,
+  watch([theme, sidebarWidth, sidebarState, lastExpandedWidth, previewRatio, recentFiles, favorites, wordWrap, indentSize,
     fontSize,
     scratchClosePrompt, lastExportPath,
     openTabs, activeTabId], () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       theme: theme.value,
       sidebarWidth: sidebarWidth.value,
+      sidebarState: sidebarState.value,
+      lastExpandedWidth: lastExpandedWidth.value,
       previewRatio: previewRatio.value,
       recentFiles: recentFiles.value,
       favorites: favorites.value,
@@ -193,6 +183,11 @@ export const useAppStore = defineStore('app', () => {
   function setActive(id: string) {
     activeTabId.value = id;
   }
+  
+  function setActivePanel(panel: 'editor' | 'preview') {
+    activePanel.value = panel;
+  }
+
   function updateTabDirtyByPath(path: string, dirty: boolean, cachedText?: string) {
     const t = openTabs.value.find(x => x.path === path);
     if (t) {
@@ -213,16 +208,15 @@ export const useAppStore = defineStore('app', () => {
 
     openTabs.value.splice(idx, 1);
     
-    // If closed tab was active, switch to neighbor or create scratch
+    // If closed tab was active, switch to neighbor or empty
     if (activeTabId.value === id) {
       if (openTabs.value.length > 0) {
         // Try next, or prev if at end
         const newIdx = Math.min(idx, openTabs.value.length - 1);
         activeTabId.value = openTabs.value[newIdx].id;
       } else {
-        // No tabs left, create scratch
-        createScratchTab();
-        activeTabId.value = openTabs.value[0].id;
+        // No tabs left
+        activeTabId.value = '';
       }
     }
   }
@@ -230,6 +224,9 @@ export const useAppStore = defineStore('app', () => {
   return {
     theme,
     sidebarWidth,
+    sidebarState,
+    lastExpandedWidth,
+    isSidebarDragging,
     previewRatio,
     recentFiles,
     favorites,
@@ -252,6 +249,8 @@ export const useAppStore = defineStore('app', () => {
     ensureTab,
     createScratchTab,
     setActive,
+    activePanel,
+    setActivePanel,
     updateTabDirtyByPath,
     updateTabDirtyById,
     removeTab

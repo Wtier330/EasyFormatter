@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, watch } from 'vue';
+import { ref, watch, type Ref } from 'vue';
 import { createDiscreteApi } from 'naive-ui';
 import { commands } from '../tauri';
 import { safeParse, formatJson, minifyJson } from '../utils/json';
@@ -8,6 +8,9 @@ import { detectWrapper, type WrapperDetection } from '../utils/wrapper';
 import { calculateHash } from '../utils/hash';
 import { useAppStore } from './app';
 import type { ValidationError } from '../types/validation';
+import { HistoryManager, type Command } from '../utils/history';
+import iconv from 'iconv-lite';
+import { Buffer } from 'buffer';
 
 const { message } = createDiscreteApi(['message'], {
   messageProviderProps: {
@@ -35,6 +38,130 @@ export const useConfigStore = defineStore('config', () => {
   const locateRequest = ref<string | null>(null);
   const pasteRequest = ref<string | null>(null);
 
+  // Encoding & EOL
+  const encoding = ref('utf-8');
+  const eol = ref<'LF' | 'CRLF'>('LF');
+  const eolRequest = ref<'LF' | 'CRLF' | null>(null);
+
+  // Text Transform State
+  const transformRequest = ref<string | null>(null);
+  const transformResult = ref<string | null>(null);
+  const transformMode = ref<string | null>(null);
+  
+  // Transform History
+  const historyManager = new HistoryManager(20, 5 * 1024 * 1024);
+  const docHistoryManager = new HistoryManager(20, 5 * 1024 * 1024);
+
+  const canUndo = ref(false);
+  const canRedo = ref(false);
+  const canUndoDocument = ref(false);
+  const canRedoDocument = ref(false);
+
+  class UpdateTransformResultCommand implements Command {
+    constructor(
+      private transformResultRef: Ref<string | null>,
+      private transformModeRef: Ref<string | null>,
+      private prevResult: string | null,
+      private nextResult: string | null,
+      private prevMode: string | null,
+      private nextMode: string | null
+    ) {}
+
+    execute() {
+      this.transformResultRef.value = this.nextResult;
+      this.transformModeRef.value = this.nextMode;
+    }
+
+    undo() {
+      this.transformResultRef.value = this.prevResult;
+      this.transformModeRef.value = this.prevMode;
+    }
+
+    getEstimatedSize() {
+      // Estimate size: string length * 2 (UTF-16)
+      return (
+        (this.prevResult?.length || 0) * 2 + 
+        (this.nextResult?.length || 0) * 2 + 
+        (this.prevMode?.length || 0) * 2 + 
+        (this.nextMode?.length || 0) * 2
+      );
+    }
+  }
+
+  class UpdateDocumentCommand implements Command {
+    constructor(
+      private updateFn: (text: string) => void,
+      private prevText: string,
+      private nextText: string
+    ) {}
+
+    execute() {
+      this.updateFn(this.nextText);
+    }
+
+    undo() {
+      this.updateFn(this.prevText);
+    }
+
+    getEstimatedSize() {
+      return (this.prevText.length + this.nextText.length) * 2;
+    }
+  }
+
+  function setTransformResult(result: string | null, mode: string | null) {
+    if (transformResult.value === result && transformMode.value === mode) return;
+
+    const command = new UpdateTransformResultCommand(
+      transformResult,
+      transformMode,
+      transformResult.value,
+      result,
+      transformMode.value,
+      mode
+    );
+
+    // Update state
+    transformResult.value = result;
+    transformMode.value = mode;
+
+    // Record history
+    historyManager.push(command);
+    updateHistoryState();
+  }
+
+  function undoTransform() {
+    historyManager.undo();
+    updateHistoryState();
+  }
+
+  function redoTransform() {
+    historyManager.redo();
+    updateHistoryState();
+  }
+
+  function updateHistoryState() {
+    canUndo.value = historyManager.canUndo;
+    canRedo.value = historyManager.canRedo;
+  }
+
+  function undoDocument() {
+    docHistoryManager.undo();
+    updateDocumentHistoryState();
+  }
+
+  function redoDocument() {
+    docHistoryManager.redo();
+    updateDocumentHistoryState();
+  }
+
+  function updateDocumentHistoryState() {
+    canUndoDocument.value = docHistoryManager.canUndo;
+    canRedoDocument.value = docHistoryManager.canRedo;
+  }
+  
+  // Editor Action Request (Undo, Redo, etc.)
+  const editorActionRequest = ref<'undo' | 'redo' | 'selectAll' | 'cut' | 'copy' | 'paste' | null>(null);
+
   // Compatible Mode State
   const isCompatibleMode = ref(false);
   const compatibleInfo = ref<WrapperDetection>({ isWrapper: false });
@@ -44,13 +171,34 @@ export const useConfigStore = defineStore('config', () => {
   // Actions
   async function loadFile(path: string) {
     try {
-      const text = await commands.readText(path);
+      const bytes = await commands.readFile(path);
+      let text = '';
+      
+      const enc = encoding.value.toLowerCase();
+      if (enc === 'utf-8') {
+        text = new TextDecoder('utf-8').decode(bytes);
+      } else {
+        // iconv-lite needs Buffer
+        text = iconv.decode(Buffer.from(bytes), enc);
+      }
+
+      // Detect EOL
+      if (text.includes('\r\n')) {
+        eol.value = 'CRLF';
+      } else {
+        eol.value = 'LF';
+      }
+
       currentFilePath.value = path;
       rawText.value = text;
       originalHash.value = await calculateHash(text);
       isDirty.value = false;
       appStore.addRecentFile(path);
       parseAndValidate(text);
+
+      // Clear history when loading new file
+      docHistoryManager.clear();
+      updateDocumentHistoryState();
     } catch (e: any) {
       console.error(e);
       
@@ -96,7 +244,16 @@ export const useConfigStore = defineStore('config', () => {
     }
     
     try {
-      await commands.writeText(currentFilePath.value, rawText.value);
+      let buffer: Uint8Array;
+      const enc = encoding.value.toLowerCase();
+      
+      if (enc === 'utf-8') {
+        buffer = new TextEncoder().encode(rawText.value);
+      } else {
+        buffer = iconv.encode(rawText.value, enc);
+      }
+      
+      await commands.writeFile(currentFilePath.value, buffer);
       originalHash.value = await calculateHash(rawText.value);
       isDirty.value = false;
       return true;
@@ -106,7 +263,21 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  function updateText(text: string) {
+  async function setEncoding(enc: string) {
+    if (encoding.value === enc) return;
+    encoding.value = enc;
+    if (currentFilePath.value) {
+      await loadFile(currentFilePath.value);
+    }
+  }
+
+  function setEol(type: 'LF' | 'CRLF') {
+    if (eol.value === type) return;
+    eol.value = type;
+    eolRequest.value = type;
+  }
+
+  function internalUpdateText(text: string) {
     rawText.value = text;
     isDirty.value = true;
     parseAndValidate(text);
@@ -117,6 +288,27 @@ export const useConfigStore = defineStore('config', () => {
       if (rawText.value !== localText) return;
       isDirty.value = hash !== originalHash.value;
     });
+  }
+
+  function updateText(text: string, source: 'editor' | 'other' = 'other') {
+    if (text === rawText.value) return;
+
+    const command = new UpdateDocumentCommand(
+      internalUpdateText,
+      rawText.value,
+      text
+    );
+
+    if (source === 'editor') {
+      // Update state immediately
+      internalUpdateText(text);
+      // Record history (push without re-executing)
+      docHistoryManager.push(command);
+    } else {
+      // Execute via history manager (execute + push)
+      docHistoryManager.execute(command);
+    }
+    updateDocumentHistoryState();
   }
   
   function setActiveBuffer(path: string | null, text: string, dirty: boolean, hash?: string) {
@@ -139,6 +331,10 @@ export const useConfigStore = defineStore('config', () => {
     }
     isDirty.value = dirty;
     parseAndValidate(text);
+    
+    // Clear history when switching buffers
+    docHistoryManager.clear();
+    updateDocumentHistoryState();
   }
 
   function extractWrapper() {
@@ -248,8 +444,25 @@ export const useConfigStore = defineStore('config', () => {
     cursorPos,
     locateRequest,
     pasteRequest,
+    transformRequest,
+    transformResult,
+    transformMode,
+    setTransformResult,
+    undoTransform,
+    redoTransform,
+    canUndo,
+    canRedo,
+    undoDocument,
+    redoDocument,
+    canUndoDocument,
+    canRedoDocument,
+    encoding,
+    eol,
+    eolRequest,
     loadFile,
     saveFile,
+    setEncoding,
+    setEol,
     updateText,
     extractWrapper,
     format,
@@ -257,6 +470,7 @@ export const useConfigStore = defineStore('config', () => {
     setActiveBuffer,
     startMonitoring,
     isCompatibleMode,
-    compatibleInfo
+    compatibleInfo,
+    editorActionRequest
   };
 });
