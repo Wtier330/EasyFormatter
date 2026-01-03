@@ -9,6 +9,7 @@ import { calculateHash } from '../utils/hash';
 import { useAppStore } from './app';
 import type { ValidationError } from '../types/validation';
 import { HistoryManager, type Command } from '../utils/history';
+import { historyService } from '../services/historyService';
 import iconv from 'iconv-lite';
 import { Buffer } from 'buffer';
 
@@ -166,6 +167,12 @@ export const useConfigStore = defineStore('config', () => {
   const isCompatibleMode = ref(false);
   const compatibleInfo = ref<WrapperDetection>({ isWrapper: false });
 
+  // History Settings
+  const historyRetention = ref({
+      maxDays: 30,
+      maxRecords: 200
+  });
+
   const EMPTY_HASH = 'da39a3ee5e6b4b0d3255bfef95601890afd80709';
 
   // Actions
@@ -256,6 +263,10 @@ export const useConfigStore = defineStore('config', () => {
       await commands.writeFile(currentFilePath.value, buffer);
       originalHash.value = await calculateHash(rawText.value);
       isDirty.value = false;
+
+      // Record History
+      await historyService.recordCheckpointStub(currentFilePath.value, rawText.value, undefined, 'save');
+
       return true;
     } catch (e) {
       await commands.showError(`保存失败: ${e}`);
@@ -398,6 +409,10 @@ export const useConfigStore = defineStore('config', () => {
       if (formatted !== rawText.value) {
         // 格式化改变了文本 -> updateText 将触发脏检查
         updateText(formatted);
+        // Record format operation (if file exists)
+        if (currentFilePath.value) {
+           historyService.recordCheckpointStub(currentFilePath.value, formatted, undefined, 'format');
+        }
       }
     }
   }
@@ -408,6 +423,10 @@ export const useConfigStore = defineStore('config', () => {
       const minified = minifyJson(data);
       if (minified !== rawText.value) {
         updateText(minified);
+        // Record minify operation (if file exists)
+        if (currentFilePath.value) {
+           historyService.recordCheckpointStub(currentFilePath.value, minified, undefined, 'compress');
+        }
       }
     }
   }
@@ -471,6 +490,7 @@ export const useConfigStore = defineStore('config', () => {
     startMonitoring,
     isCompatibleMode,
     compatibleInfo,
-    editorActionRequest
+    editorActionRequest,
+    historyRetention
   };
 });

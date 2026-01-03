@@ -3,6 +3,7 @@
     class="splitter" 
     :class="{ dragging: isDragging }"
     @mousedown="startDrag"
+    @touchstart.passive="startTouchDrag"
   >
     <div class="splitter-line"></div>
   </div>
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 let startX = 0;
 const isDragging = ref(false);
 
+// Mouse Events
 function startDrag(e: MouseEvent) {
   startX = e.clientX;
   isDragging.value = true;
@@ -38,6 +40,7 @@ function onDrag(e: MouseEvent) {
 }
 
 function stopDrag() {
+  if (!isDragging.value) return;
   isDragging.value = false;
   emit('dragEnd');
   
@@ -47,7 +50,43 @@ function stopDrag() {
   document.body.style.userSelect = '';
 }
 
-onUnmounted(() => stopDrag()); // cleanup safety
+// Touch Events
+function startTouchDrag(e: TouchEvent) {
+  if (e.touches.length !== 1) return;
+  startX = e.touches[0].clientX;
+  isDragging.value = true;
+  emit('dragStart');
+  
+  document.addEventListener('touchmove', onTouchDrag, { passive: false });
+  document.addEventListener('touchend', stopTouchDrag);
+  document.body.style.userSelect = 'none';
+}
+
+function onTouchDrag(e: TouchEvent) {
+  if (e.touches.length !== 1) return;
+  // Prevent scrolling while dragging
+  if (e.cancelable) e.preventDefault(); 
+  
+  const currentX = e.touches[0].clientX;
+  const delta = currentX - startX;
+  startX = currentX;
+  emit('resize', delta);
+}
+
+function stopTouchDrag() {
+  if (!isDragging.value) return;
+  isDragging.value = false;
+  emit('dragEnd');
+  
+  document.removeEventListener('touchmove', onTouchDrag);
+  document.removeEventListener('touchend', stopTouchDrag);
+  document.body.style.userSelect = '';
+}
+
+onUnmounted(() => {
+  stopDrag();
+  stopTouchDrag();
+}); // cleanup safety
 </script>
 
 <style scoped>

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import type { RecentFileItem } from '../types/config';
+import { commands } from '../tauri';
 
 const STORAGE_KEY = 'easy-formatter-app-state';
 
@@ -221,6 +222,39 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function syncFilesStatus() {
+    const updatedList = [...recentFiles.value];
+    let changed = false;
+
+    for (let i = 0; i < updatedList.length; i++) {
+      const file = updatedList[i];
+      try {
+        const stats = await commands.stat(file.path);
+        // @ts-ignore
+        const mtime = stats.mtime ? new Date(stats.mtime).getTime() : Date.now();
+        
+        // Update only if changed to avoid unnecessary reactivity triggers if we were deeper
+        if (file.size !== stats.size || file.lastModified !== mtime) {
+            updatedList[i] = {
+              ...file,
+              size: stats.size,
+              lastModified: mtime
+            };
+            changed = true;
+        }
+      } catch (e) {
+        console.warn(`[AppStore] Sync status failed for ${file.path}`, e);
+        // If file not found, we could mark it or leave it. 
+        // For now, leave it.
+      }
+    }
+    
+    if (changed) {
+        recentFiles.value = updatedList;
+        console.log('[AppStore] Synced file status');
+    }
+  }
+
   return {
     theme,
     sidebarWidth,
@@ -253,6 +287,7 @@ export const useAppStore = defineStore('app', () => {
     setActivePanel,
     updateTabDirtyByPath,
     updateTabDirtyById,
-    removeTab
+    removeTab,
+    syncFilesStatus
   };
 });

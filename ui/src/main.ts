@@ -3,6 +3,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import './style.css';
 import { Buffer } from 'buffer';
+import { setupPanelRegistry } from './layout/setupRegistry';
 
 // Polyfill Buffer for iconv-lite
 if (typeof window !== 'undefined') {
@@ -23,4 +24,8 @@ app.config.errorHandler = (err, _instance, info) => {
 const pinia = createPinia();
 
 app.use(pinia);
+
+// Setup Registry after Pinia (though registry doesn't use pinia, but good practice)
+setupPanelRegistry();
+
 app.mount('#app');

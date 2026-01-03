@@ -27,6 +27,13 @@ export const commands = {
       filters: [{ name: 'JSON', extensions: ['json', 'jsonc', 'txt'] }]
     });
   },
+
+  pickFolder: async () => {
+    return await dialogOpen({
+      multiple: false,
+      directory: true
+    });
+  },
   
   saveFile: async (defaultPath?: string) => {
     return await dialogSave({
