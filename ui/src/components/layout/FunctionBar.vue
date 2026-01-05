@@ -165,7 +165,7 @@ function handleTransformSelect(key: string) {
 // Toggle Expand/Collapse Logic
 const isExpanded = ref(false);
 
-const expandTitle = computed(() => isExpanded.value ? '全折叠' : '全展开');
+const expandTitle = computed(() => isExpanded.value ? '折叠' : '展开');
 
 function toggleExpand() {
   if (isExpanded.value) {

@@ -46,18 +46,69 @@ pub fn file_exists(path: String) -> bool {
 
 #[tauri::command]
 pub fn reveal_in_explorer(path: String) -> Result<(), String> {
-    // 在 Windows 上使用 explorer.exe 打开定位
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(path)
+        use std::process::Command;
+        use std::path::Path;
+
+        let p = Path::new(&path);
+        let mut cmd = Command::new("explorer");
+
+        if p.exists() {
+            if p.is_file() {
+                cmd.arg("/select,").arg(&path);
+            } else {
+                cmd.arg(&path);
+            }
+        } else if let Some(parent) = p.parent() {
+            cmd.arg(parent);
+        } else {
+            cmd.arg(&path);
+        }
+
+        cmd.spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let p = std::path::Path::new(&path);
+        if p.exists() {
+            Command::new("open")
+                .arg("-R")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else if let Some(parent) = p.parent() {
+            Command::new("open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("open")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        use std::process::Command;
+        use std::path::Path;
+
+        let p = Path::new(&path);
+        let dir = if p.is_file() {
+            p.parent().unwrap_or(p)
+        } else {
+            p
+        };
+
+        Command::new("xdg-open")
+            .arg(dir)
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(())
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("仅支持 Windows 平台的资源管理器定位".into())
     }
 }
 

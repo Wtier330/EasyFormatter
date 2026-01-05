@@ -1,5 +1,23 @@
 import { invoke } from '@tauri-apps/api/core';
 
+type NoiseRecordMode = 'disable' | 'redirect' | 'allow';
+
+const noiseRecordMode: NoiseRecordMode =
+  (import.meta.env.VITE_HISTORY_NOISE_RECORD_MODE as NoiseRecordMode) ?? 'disable';
+
+function getNullSinkPath(): string {
+  if (typeof navigator !== 'undefined') {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('windows')) return 'NUL';
+  }
+  return '/dev/null';
+}
+
+function isNoiseFilePath(filePath: string): boolean {
+  const name = filePath.split(/[/\\]/).pop() || filePath;
+  return /^EF_.+\.json$/i.test(name);
+}
+
 export interface HistoryHealthCheckResult {
   enabled: boolean;
   db_path: string | null;
@@ -91,6 +109,12 @@ export const historyService = {
    */
   async recordCheckpointStub(filePath: string, content: string, note?: string, opType?: string): Promise<number> {
     try {
+      if (isNoiseFilePath(filePath)) {
+        if (noiseRecordMode === 'disable') return 0;
+        if (noiseRecordMode === 'redirect') {
+          filePath = getNullSinkPath();
+        }
+      }
       return await invoke<number>('history_record_stub', { filePath, content, note, opType });
     } catch (e) {
       // 失败不应阻断主流程，仅打日志
@@ -131,6 +155,10 @@ export const historyService = {
 
   async deleteVersions(fileId: number, versionIds: number[]): Promise<HistoryDeleteResult> {
     return await invoke<HistoryDeleteResult>('history_delete_versions', { fileId, versionIds });
+  },
+
+  async deleteFileHistory(fileId: number): Promise<HistoryDeleteResult> {
+    return await invoke<HistoryDeleteResult>('history_delete_file_history', { fileId });
   },
 
   /**

@@ -41,6 +41,7 @@
           class="file-item"
           :class="{ active: store.activeFile?.id === file.id }"
           @click="selectFile(file)"
+          @contextmenu.prevent="openFileContextMenu($event, file)"
         >
           <div class="icon">
             <n-icon v-if="isDerivedFile(file.logical_path)"><CopyOutline /></n-icon>
@@ -55,16 +56,43 @@
           </div>
         </div>
       </div>
+
+      <n-dropdown
+        placement="bottom-start"
+        trigger="manual"
+        :x="menuX"
+        :y="menuY"
+        :options="contextMenuOptions"
+        :show="menuShow"
+        @clickoutside="menuShow = false"
+        @select="handleContextMenuSelect"
+      />
     </div>
   </div>
+
+  <n-modal
+    v-model:show="showDeleteConfirm"
+    preset="dialog"
+    title="确认删除"
+    content="确定要删除此条历史记录及其所有相关内容吗？"
+    positive-text="确认删除"
+    negative-text="取消"
+    :positive-button-props="{ type: 'error', loading: deleting }"
+    :negative-button-props="{ disabled: deleting }"
+    @positive-click="confirmDelete"
+    @negative-click="showDeleteConfirm = false"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { NInput, NIcon, NTooltip, NButton, NPopselect } from 'naive-ui';
-import { SearchOutline, DocumentTextOutline, TimeOutline, RefreshOutline, FilterOutline, CopyOutline } from '@vicons/ionicons5';
+import { ref, computed, onMounted, nextTick, h } from 'vue';
+import { NInput, NIcon, NTooltip, NButton, NPopselect, NDropdown, useMessage, NModal } from 'naive-ui';
+import { SearchOutline, DocumentTextOutline, TimeOutline, RefreshOutline, FilterOutline, CopyOutline, TrashOutline } from '@vicons/ionicons5';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
+import { formatFileSize } from '../../utils/format';
+import { historyService } from '../../services/historyService';
+import type { FileRecord } from '../../services/historyService';
 
 defineProps<{
   collapsed?: boolean;
@@ -74,6 +102,7 @@ const emit = defineEmits(['expand']);
 
 const store = useHistoryWorkspaceStore();
 const layoutStore = useSidebarLayoutStore();
+const message = useMessage();
 const searchText = ref('');
 
 const filterOptions = [
@@ -97,6 +126,27 @@ const filteredFiles = computed(() => {
   
   // 3. Sort by updated_at desc
   return [...list].sort((a, b) => b.updated_at - a.updated_at);
+});
+
+const menuShow = ref(false);
+const menuX = ref(0);
+const menuY = ref(0);
+const menuFile = ref<FileRecord | null>(null);
+
+const showDeleteConfirm = ref(false);
+const deleteTargetFile = ref<FileRecord | null>(null);
+const deleting = ref(false);
+
+const contextMenuOptions = computed(() => {
+  if (!menuFile.value) return [];
+  return [
+    {
+      label: '删除历史记录',
+      key: 'deleteHistory',
+      props: { style: 'color: #d03050' },
+      icon: () => h(NIcon, null, { default: () => h(TrashOutline) })
+    }
+  ];
 });
 
 function isDerivedFile(path: string) {
@@ -139,6 +189,69 @@ async function selectFile(file: any) {
     await store.selectFile(file);
     // Open Right Drawer for Timeline
     layoutStore.openRightDrawer('historyTimeline');
+}
+
+function openFileContextMenu(e: MouseEvent, file: FileRecord) {
+  e.preventDefault();
+  menuShow.value = false;
+  nextTick().then(() => {
+    menuFile.value = file;
+    menuX.value = e.clientX;
+    menuY.value = e.clientY;
+    menuShow.value = true;
+  });
+}
+
+function handleContextMenuSelect(key: string) {
+  menuShow.value = false;
+  if (key === 'deleteHistory' && menuFile.value) {
+    deleteTargetFile.value = menuFile.value;
+    showDeleteConfirm.value = true;
+  }
+}
+
+async function confirmDelete() {
+  if (!deleteTargetFile.value) return;
+  deleting.value = true;
+  try {
+    const res = await deleteFileHistorySafe(deleteTargetFile.value.id);
+    if (res) {
+      message.success(`已删除历史记录（${res.removed_count} 条，约 ${formatFileSize(res.removed_bytes)}）`);
+    } else {
+      message.success('已删除历史记录');
+    }
+  } catch (e) {
+    message.error(`删除失败: ${e}`);
+  } finally {
+    deleting.value = false;
+    showDeleteConfirm.value = false;
+    deleteTargetFile.value = null;
+    menuFile.value = null;
+  }
+}
+
+async function deleteFileHistorySafe(fileId: number) {
+  const anyStore = store as any;
+  if (typeof anyStore.deleteFileHistory === 'function') {
+    return await anyStore.deleteFileHistory(fileId);
+  }
+
+  const res = await historyService.deleteFileHistory(fileId);
+
+  if ((store.activeFile as any)?.id === fileId) {
+    (store.activeFile as any) = null;
+    (store.records as any) = [];
+    (store.selectedRecord as any) = null;
+    (store.compareMode as any) = false;
+    (store.inspectMode as any) = false;
+    (store.currentContent as any) = '';
+    (store.currentHash as any) = '';
+    (store.compareContent as any) = '';
+    (store.compareHash as any) = '';
+  }
+
+  await store.loadFiles();
+  return res;
 }
 
 onMounted(() => {

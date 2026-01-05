@@ -37,6 +37,24 @@ fn canonicalize(text: &str) -> (String, String, bool) {
     }
 }
 
+fn is_noise_record_path(file_path: &str) -> bool {
+    let name = file_path
+        .split(|c| c == '/' || c == '\\')
+        .last()
+        .unwrap_or(file_path);
+    let name_lower = name.to_ascii_lowercase();
+    name_lower.starts_with("ef_") && name_lower.ends_with(".json")
+}
+
+fn is_noise_artifact_path(file_path: &str) -> bool {
+    let name = file_path
+        .split(|c| c == '/' || c == '\\')
+        .last()
+        .unwrap_or(file_path);
+    let name_lower = name.to_ascii_lowercase();
+    (name_lower.starts_with("ef_") || name_lower.starts_with("test_")) && name_lower.ends_with(".json")
+}
+
 // Helper: Materialize Logic
 fn materialize_version_logic(repo: &SqliteHistoryRepo, version_id: i64) -> Result<(String, bool), String> {
     let mut current_ver = repo.get_version(version_id).map_err(|e| e.to_string())?;
@@ -137,6 +155,15 @@ pub fn history_list_versions(file_id: i64) -> Result<Vec<VersionSummary>, String
 #[command]
 pub fn history_record_stub(file_path: String, content: String, note: Option<String>, op_type: Option<String>) -> Result<i64, String> {
     if !is_deployment_mode() { return Ok(0); }
+
+    let trimmed = file_path.trim();
+    if trimmed.eq_ignore_ascii_case("NUL")
+        || trimmed == "/dev/null"
+        || trimmed.eq_ignore_ascii_case(r"\\.\NUL")
+        || is_noise_record_path(trimmed)
+    {
+        return Ok(0);
+    }
 
     let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
     let file_id = repo.get_or_create_file(&file_path).map_err(|e| e.to_string())?;
@@ -316,6 +343,16 @@ pub struct GcResult {
 }
 
 #[command]
+pub fn history_delete_file_history(file_id: i64) -> Result<GcResult, String> {
+    if !is_deployment_mode() { return Err("History disabled".into()); }
+    let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
+    let (removed_count, removed_bytes) = repo
+        .delete_file_history(file_id)
+        .map_err(|e| e.to_string())?;
+    Ok(GcResult { removed_count, removed_bytes })
+}
+
+#[command]
 pub fn history_delete_versions(file_id: i64, version_ids: Vec<i64>) -> Result<GcResult, String> {
     if !is_deployment_mode() { return Err("History disabled".into()); }
     let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
@@ -331,6 +368,194 @@ pub fn history_gc(max_days: Option<i64>, max_records: Option<i64>) -> Result<GcR
     let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
     let (removed_count, removed_bytes) = repo.gc(max_days, max_records).map_err(|e| e.to_string())?;
     Ok(GcResult { removed_count, removed_bytes })
+}
+
+#[derive(serde::Serialize)]
+pub struct NoiseScanResult {
+    pub searched_roots: Vec<String>,
+    pub db_file_count: i64,
+    pub db_version_count: i64,
+    pub db_payload_bytes: u64,
+    pub db_sample_paths: Vec<String>,
+    pub fs_file_count: u64,
+    pub fs_bytes: u64,
+    pub fs_sample_paths: Vec<String>,
+}
+
+fn scan_noise_files_in_roots(roots: &[std::path::PathBuf], limit: usize) -> (u64, u64, Vec<String>) {
+    use std::collections::VecDeque;
+    use std::fs;
+
+    let mut total_files: u64 = 0;
+    let mut total_bytes: u64 = 0;
+    let mut sample_paths: Vec<String> = Vec::new();
+
+    for root in roots {
+        if sample_paths.len() >= limit {
+            break;
+        }
+        if !root.exists() {
+            continue;
+        }
+
+        let mut queue: VecDeque<std::path::PathBuf> = VecDeque::new();
+        queue.push_back(root.clone());
+
+        while let Some(dir) = queue.pop_front() {
+            if sample_paths.len() >= limit {
+                break;
+            }
+            let rd = match fs::read_dir(&dir) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            for entry in rd.flatten() {
+                if sample_paths.len() >= limit {
+                    break;
+                }
+                let path = entry.path();
+                let ft = match entry.file_type() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if ft.is_dir() {
+                    queue.push_back(path);
+                    continue;
+                }
+                if !ft.is_file() {
+                    continue;
+                }
+                let p_str = path.to_string_lossy().to_string();
+                if !is_noise_artifact_path(&p_str) {
+                    continue;
+                }
+                let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                total_files += 1;
+                total_bytes += size;
+                sample_paths.push(p_str);
+            }
+        }
+    }
+
+    (total_files, total_bytes, sample_paths)
+}
+
+fn purge_noise_files_in_roots(roots: &[std::path::PathBuf]) -> (u64, u64) {
+    use std::collections::VecDeque;
+    use std::fs;
+
+    let mut removed_files: u64 = 0;
+    let mut removed_bytes: u64 = 0;
+
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+
+        let mut queue: VecDeque<std::path::PathBuf> = VecDeque::new();
+        queue.push_back(root.clone());
+
+        while let Some(dir) = queue.pop_front() {
+            let rd = match fs::read_dir(&dir) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            for entry in rd.flatten() {
+                let path = entry.path();
+                let ft = match entry.file_type() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if ft.is_dir() {
+                    queue.push_back(path);
+                    continue;
+                }
+                if !ft.is_file() {
+                    continue;
+                }
+                let p_str = path.to_string_lossy().to_string();
+                if !is_noise_artifact_path(&p_str) {
+                    continue;
+                }
+                let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                if fs::remove_file(&path).is_ok() {
+                    removed_files += 1;
+                    removed_bytes += size;
+                }
+            }
+        }
+    }
+
+    (removed_files, removed_bytes)
+}
+
+#[command]
+pub fn history_scan_noise_files(limit: Option<u32>) -> Result<NoiseScanResult, String> {
+    if !is_deployment_mode() {
+        return Err("History disabled".into());
+    }
+
+    let limit = limit.unwrap_or(200).clamp(1, 2000) as usize;
+    let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
+    let db = repo.scan_noise_db(limit).map_err(|e| e.to_string())?;
+
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(dirs) = get_app_dirs() {
+        roots.push(dirs.root);
+    }
+    roots.push(std::env::temp_dir());
+
+    let (fs_file_count, fs_bytes, fs_sample_paths) = scan_noise_files_in_roots(&roots, limit);
+    let searched_roots = roots
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+
+    Ok(NoiseScanResult {
+        searched_roots,
+        db_file_count: db.file_count,
+        db_version_count: db.version_count,
+        db_payload_bytes: db.payload_bytes,
+        db_sample_paths: db.sample_paths,
+        fs_file_count,
+        fs_bytes,
+        fs_sample_paths,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct NoisePurgeResult {
+    pub removed_count: i64,
+    pub removed_bytes: u64,
+    pub fs_removed_files: u64,
+    pub fs_removed_bytes: u64,
+}
+
+#[command]
+pub fn history_purge_noise_files() -> Result<NoisePurgeResult, String> {
+    if !is_deployment_mode() {
+        return Err("History disabled".into());
+    }
+
+    let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
+    let (removed_count, removed_bytes) = repo.purge_noise_db().map_err(|e| e.to_string())?;
+
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(dirs) = get_app_dirs() {
+        roots.push(dirs.root);
+    }
+    roots.push(std::env::temp_dir());
+
+    let (fs_removed_files, fs_removed_bytes) = purge_noise_files_in_roots(&roots);
+
+    Ok(NoisePurgeResult {
+        removed_count,
+        removed_bytes,
+        fs_removed_files,
+        fs_removed_bytes,
+    })
 }
 
 #[derive(serde::Serialize)]

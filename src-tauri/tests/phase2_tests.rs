@@ -8,7 +8,7 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 fn rand_path() -> String {
     let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
     let c = COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("C:/EF_{}_{}.json", t, c)
+    format!("C:/test_{}_{}.json", t, c)
 }
 
 #[test]
@@ -70,6 +70,35 @@ fn chain_materialize_from_checkpoint() {
 }
 
 #[test]
+fn delete_single_version_keeps_chain_valid() {
+    env::set_var("EASYFORMATTER_MODE", "deploy");
+    let path = rand_path();
+    let a = r#"{"v":1}"#.to_string();
+    let b = r#"{"v":2}"#.to_string();
+    let c = r#"{"v":3}"#.to_string();
+
+    let id1 = commands::history_record_stub(path.clone(), a.clone(), None, Some("save".into())).unwrap();
+    let id2 = commands::history_record_stub(path.clone(), b.clone(), None, Some("format".into())).unwrap();
+    let id3 = commands::history_record_stub(path.clone(), c.clone(), None, Some("format".into())).unwrap();
+
+    let repo = SqliteHistoryRepo::new().unwrap();
+    let fid = repo.get_or_create_file(&path).unwrap();
+
+    let (removed_count, _) = repo.delete_versions_from_latest(fid, vec![id2]).unwrap();
+    assert_eq!(removed_count, 1);
+
+    let versions = repo.list_versions(fid).unwrap();
+    assert_eq!(versions.len(), 2);
+    assert!(versions.iter().any(|v| v.id == id1));
+    assert!(versions.iter().any(|v| v.id == id3));
+
+    let content1 = commands::history_get_version_content(id1).unwrap();
+    let content3 = commands::history_get_version_content(id3).unwrap();
+    assert_eq!(content1, a);
+    assert_eq!(content3, c);
+}
+
+#[test]
 fn copy_restore_creates_file() {
     env::set_var("EASYFORMATTER_MODE", "deploy");
     let path = rand_path();
@@ -96,4 +125,15 @@ fn broken_chain_errors_on_materialize() {
         let err = commands::history_materialize(id2).err().unwrap();
         assert!(err.contains("Broken chain"));
     }
+}
+
+#[test]
+fn null_sink_path_is_ignored() {
+    env::set_var("EASYFORMATTER_MODE", "deploy");
+    let id = commands::history_record_stub("NUL".to_string(), r#"{"a":1}"#.to_string(), None, Some("save".into())).unwrap();
+    assert_eq!(id, 0);
+
+    let repo = SqliteHistoryRepo::new().unwrap();
+    let files = repo.list_files().unwrap();
+    assert!(!files.iter().any(|f| f.logical_path == "NUL"));
 }

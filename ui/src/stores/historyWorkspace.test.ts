@@ -18,6 +18,7 @@ vi.mock('../services/historyService', () => {
       recordCheckpointStub: vi.fn(async () => 1),
       copyRestore: vi.fn(async () => 'C:/exports/restored.json'),
       deleteVersions: vi.fn(async () => ({ removed_count: 1, removed_bytes: 10 })),
+      deleteFileHistory: vi.fn(async () => ({ removed_count: 1, removed_bytes: 10 })),
       getStats: vi.fn(async () => ({ db_size: 0, records_count: 0, file_count: 1, top_files: [] })),
       gc: vi.fn(async () => ({ removed_count: 0, removed_bytes: 0 }))
     }

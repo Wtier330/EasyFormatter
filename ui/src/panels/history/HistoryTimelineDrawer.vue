@@ -73,7 +73,7 @@
                     quaternary
                     type="error"
                     @click.stop="requestDelete([record.id])"
-                    title="删除该条记录（会连带删除较新记录）"
+                    title="删除该条记录"
                   >
                     <template #icon><n-icon><TrashOutline /></n-icon></template>
                   </n-button>
@@ -129,7 +129,7 @@
                     quaternary
                     type="error"
                     @click.stop="requestDelete([record.id])"
-                    title="删除该条记录（会连带删除较新记录）"
+                    title="删除该条记录"
                   >
                     <template #icon><n-icon><TrashOutline /></n-icon></template>
                   </n-button>
@@ -280,12 +280,8 @@ function toggleDeleteSelection(id: number, checked: boolean) {
 function computeDeletePlan(ids: number[]) {
   if (ids.length === 0) return null;
   const idSet = new Set(ids);
-  let boundary = -1;
-  for (let i = 0; i < store.records.length; i++) {
-    if (idSet.has(store.records[i].id)) boundary = Math.max(boundary, i);
-  }
-  if (boundary < 0) return null;
-  const affected = store.records.slice(0, boundary + 1);
+  const affected = store.records.filter(r => idSet.has(r.id));
+  if (affected.length === 0) return null;
   const removedBytes = affected.reduce((acc, r) => acc + r.payload_size, 0);
   return {
     removedCount: affected.length,
@@ -298,7 +294,7 @@ function computeDeletePlan(ids: number[]) {
 const deleteConfirmText = computed(() => {
   const plan = computeDeletePlan(deleteCandidateIds.value);
   if (!plan) return '未找到可删除的记录。';
-  return `将删除 ${plan.removedCount} 条记录（约 ${formatFileSize(plan.removedBytes)}，从 ${formatTime(plan.newest.ts)} 到 ${formatTime(plan.oldest.ts)}），以保证历史链完整。此操作不可撤销。`;
+  return `将删除 ${plan.removedCount} 条记录（约 ${formatFileSize(plan.removedBytes)}，从 ${formatTime(plan.newest.ts)} 到 ${formatTime(plan.oldest.ts)}）。系统会自动修复历史链，确保其余记录可正常还原。此操作不可撤销。`;
 });
 
 function requestDelete(ids: number[]) {

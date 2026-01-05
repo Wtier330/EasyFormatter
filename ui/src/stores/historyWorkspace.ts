@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia';
+import { defineStore, acceptHMRUpdate } from 'pinia';
 import { ref } from 'vue';
 import { historyService, type FileRecord, type HistoryDeleteResult, type VersionSummary } from '../services/historyService';
 import { commands } from '../tauri';
@@ -248,6 +248,33 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
       }
   }
 
+  async function deleteFileHistory(fileId: number): Promise<HistoryDeleteResult | null> {
+      loading.value = true;
+      try {
+          const res = await historyService.deleteFileHistory(fileId);
+
+          if (activeFile.value?.id === fileId) {
+              activeFile.value = null;
+              records.value = [];
+              selectedRecord.value = null;
+              compareMode.value = false;
+              inspectMode.value = false;
+              currentContent.value = '';
+              currentHash.value = '';
+              compareContent.value = '';
+              compareHash.value = '';
+          }
+
+          await loadFiles();
+          return res;
+      } catch (e) {
+          error.value = String(e);
+          throw e;
+      } finally {
+          loading.value = false;
+      }
+  }
+
   async function copyRestoreSelectedVersion(targetDir?: string) {
       if (!selectedRecord.value) return;
       loading.value = true;
@@ -335,6 +362,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     overwriteRestore,
     copyRestoreSelectedVersion,
     deleteVersions,
+    deleteFileHistory,
     fetchStats,
     gc,
     sidebarWidth,
@@ -343,3 +371,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     lastExpandedWidth
   };
 });
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useHistoryWorkspaceStore, import.meta.hot));
+}

@@ -5,7 +5,7 @@ use super::commands;
 
 fn rand_path() -> String {
     let s: String = rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-    format!("C:/EF_{}.json", s)
+    format!("C:/test_{}.json", s)
 }
 
 #[test]
