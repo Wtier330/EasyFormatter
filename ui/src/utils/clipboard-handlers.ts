@@ -1,4 +1,4 @@
-import { readText } from '@tauri-apps/plugin-clipboard-manager';
+import { isTauriRuntime } from '../tauri';
 
 /**
  * Utility functions for handling clipboard data and file reading.
@@ -90,7 +90,8 @@ export async function readClipboardWithFallback(): Promise<ClipboardContent | nu
   // 1. Try Tauri Plugin first (if available and running in Tauri)
   try {
     // Check if we are in Tauri environment
-    if ('__TAURI_INTERNALS__' in window) {
+    if (isTauriRuntime()) {
+       const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
        const text = await readText();
        if (text) {
          return { text, source: 'text' };

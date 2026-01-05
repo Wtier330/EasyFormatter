@@ -45,36 +45,41 @@
 
             <!-- Mode 2: History Browse Mode (Single Viewer) -->
             <div class="work-area history-browse" v-else-if="isHistoryMode">
-                 <HistorySingleViewer 
-                    :content="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareContent : historyWorkspaceStore.currentContent" 
-                    :record="historyWorkspaceStore.selectedRecord ?? (historyWorkspaceStore.records[0] ?? null)"
+              <div class="history-host">
+                <HistorySingleViewer 
+                  :content="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareContent : historyWorkspaceStore.currentContent" 
+                  :record="historyWorkspaceStore.selectedRecord ?? (historyWorkspaceStore.records[0] ?? null)"
+                  :language="computedHistoryLanguage"
+                  :hash="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareHash : historyWorkspaceStore.currentHash"
+                />
+
+                <!-- History Detail Overlay (Inspect Phase) -->
+                <div v-if="historyWorkspaceStore.inspectMode" class="history-overlay">
+                  <HistoryWorkbench 
+                    :currentContent="historyWorkspaceStore.currentContent"
+                    :compareContent="historyWorkspaceStore.compareContent"
+                    :compareMode="historyWorkspaceStore.compareMode"
                     :language="computedHistoryLanguage"
-                    :hash="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareHash : historyWorkspaceStore.currentHash"
-                 />
+                  />
+                </div>
+              </div>
             </div>
 
             <!-- Empty State -->
             <EmptyState v-else :onNewFile="handleNew" />
 
-            <!-- History Detail Overlay (Inspect Phase) -->
-            <div v-if="historyWorkspaceStore.inspectMode" class="history-overlay">
-                <HistoryWorkbench 
-                    :currentContent="historyWorkspaceStore.currentContent"
-                    :compareContent="historyWorkspaceStore.compareContent"
-                    :compareMode="historyWorkspaceStore.compareMode"
-                />
-            </div>
         </div>
 
         <!-- 4. Right Drawer -->
-        <div 
-            v-if="isDrawerVisible && currentDrawerComponent"
-            class="right-drawer"
-            :style="{ width: drawerWidthPx }"
-        >
-             <div class="drawer-content">
-                 <component :is="currentDrawerComponent" />
-             </div>
+        <div v-if="isDrawerVisible && currentDrawerComponent" class="right-drawer-overlay">
+          <div class="drawer-mask" @click="closeDrawer" />
+
+          <div class="right-drawer" :style="{ width: drawerWidthPx }" @click.stop>
+            <div class="drawer-resizer" @mousedown.prevent="beginResizeDrawer" />
+            <div class="drawer-content">
+              <component :is="currentDrawerComponent" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -142,6 +147,8 @@ const previewRef = ref<any>(null);
 
 const isResizingPreview = ref(false);
 const isDragging = ref(false);
+const isResizingDrawer = ref(false);
+let drawerResizeCleanup: (() => void) | null = null;
 
 // Guarded history mode check to avoid store initialization timing issues
 const isHistoryMode = computed(() => {
@@ -182,7 +189,7 @@ const drawerWidthPx = computed(() => {
 // Computed Drawer Component
 const currentDrawerComponent = computed(() => {
     try {
-      const key = (layoutStore as any)?.activePanelKey;
+      const key = (layoutStore as any)?.activeDrawerKey;
       const panel = key ? panelRegistry.get(key) : undefined;
       if (panel && panel.rightDrawer) {
           return panel.rightDrawer.component ?? null;
@@ -243,6 +250,53 @@ function onResizePreview(delta: number) {
   appStore.previewRatio = next / W;
 }
 
+function closeDrawer() {
+  layoutStore.closeRightDrawer();
+}
+
+function beginResizeDrawer(e: MouseEvent) {
+  if (isResizingDrawer.value) return;
+  isResizingDrawer.value = true;
+
+  const startX = e.clientX;
+  const startWidth = (layoutStore as any)?.drawerWidth ?? 360;
+
+  const onMove = (ev: MouseEvent) => {
+    const dx = startX - ev.clientX;
+    const raw = startWidth + dx;
+    const min = 320;
+    const max = 420;
+    const next = Math.max(min, Math.min(raw, max));
+    (layoutStore as any).drawerWidth = next;
+  };
+
+  const onUp = () => {
+    isResizingDrawer.value = false;
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    drawerResizeCleanup = null;
+  };
+
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  drawerResizeCleanup = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  };
+}
+
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return;
+
+  if (historyWorkspaceStore.inspectMode) {
+    (historyWorkspaceStore as any).closeCompare?.();
+    return;
+  }
+  if (isDrawerVisible.value) {
+    closeDrawer();
+  }
+}
+
 let raf = 0;
 watch(
   () => appStore.previewRatio,
@@ -263,6 +317,7 @@ let unlistenHover: (() => void) | undefined;
 let unlistenCancel: (() => void) | undefined;
 
 onMounted(async () => {
+    window.addEventListener('keydown', onGlobalKeydown);
     window.addEventListener('resize', checkResponsive);
     
     unlistenHover = await events.onFileDropHover(() => {
@@ -331,7 +386,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cancelAnimationFrame(raf);
+  window.removeEventListener('keydown', onGlobalKeydown);
   window.removeEventListener('resize', checkResponsive);
+  if (drawerResizeCleanup) drawerResizeCleanup();
   if (unlistenDrop) unlistenDrop();
   if (unlistenHover) unlistenHover();
   if (unlistenCancel) unlistenCancel();
@@ -396,6 +453,14 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.history-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
 .editor-area {
   flex: 1;
   display: flex;
@@ -416,16 +481,50 @@ onUnmounted(() => {
 }
 
 .right-drawer {
-    flex-shrink: 0;
-    border-left: 1px solid #e0e0e0;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  border-left: 1px solid #e0e0e0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
 }
 
 .drawer-content {
     flex: 1;
     overflow: hidden;
+}
+
+.right-drawer-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.drawer-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+}
+
+.right-drawer {
+  pointer-events: auto;
+}
+
+.drawer-resizer {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
 }
 
 .empty-guide {
@@ -488,10 +587,10 @@ onUnmounted(() => {
 
 .history-overlay {
   position: absolute;
-  top: 0;
+  top: 44px;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
   background: #fff;
   z-index: 100;
   display: flex;

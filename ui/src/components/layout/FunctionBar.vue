@@ -1,7 +1,7 @@
 <template>
   <div class="function-bar" v-if="!isHistoryMode">
     <div class="bar-left">
-      <n-space :size="8">
+      <n-space :size="8" wrap>
         <n-button 
           type="default" 
           size="small" 
@@ -88,7 +88,7 @@
     </div>
     
     <div class="bar-right">
-      <n-space :size="12" align="center">
+      <n-space :size="12" align="center" wrap>
         <n-button-group size="small">
           <n-button @click="handleCopy" title="复制">
             <template #icon>
@@ -417,9 +417,9 @@ async function createFromClipboard() {
 
 async function openFile() {
   const path = await commands.pickFile();
-  if (path) {
-    await configStore.loadFile(path);
-  }
+  const resolvedPath = Array.isArray(path) ? path[0] : path;
+  if (!resolvedPath) return;
+  await configStore.loadFile(resolvedPath);
 }
 
 async function saveFile() {
@@ -491,6 +491,27 @@ async function handlePaste() {
 
 .action-btn {
   min-width: 80px; /* Consistent width for main buttons */
+}
+
+@media (max-width: 1100px) {
+  .function-bar {
+    padding: 4px 10px;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .bar-left,
+  .bar-right {
+    flex: 1 1 100%;
+  }
+
+  .bar-right {
+    justify-content: flex-start;
+  }
+
+  .action-btn {
+    min-width: 72px;
+  }
 }
 
 /* Postman-like icon buttons */

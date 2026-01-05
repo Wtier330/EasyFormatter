@@ -20,23 +20,14 @@
             <n-icon><SearchOutline /></n-icon>
           </template>
         </n-input>
-        <n-popselect 
-           v-model:value="store.fileFilterMode" 
-           :options="filterOptions" 
-           trigger="click"
-        >
-           <n-button size="small" style="margin-left: 8px" title="过滤选项">
-             <template #icon><n-icon><FilterOutline /></n-icon></template>
-           </n-button>
-        </n-popselect>
-        <n-button size="small" @click="store.loadFiles" title="刷新列表" style="margin-left: 4px">
+        <n-button size="small" @click="store.loadFiles" title="刷新列表" style="margin-left: 8px">
           <template #icon><n-icon><RefreshOutline /></n-icon></template>
         </n-button>
       </div>
       
       <div class="list-container">
         <div 
-          v-for="file in filteredFiles" 
+          v-for="file in displayFiles" 
           :key="file.id" 
           class="file-item"
           :class="{ active: store.activeFile?.id === file.id }"
@@ -86,8 +77,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, h } from 'vue';
-import { NInput, NIcon, NTooltip, NButton, NPopselect, NDropdown, useMessage, NModal } from 'naive-ui';
-import { SearchOutline, DocumentTextOutline, TimeOutline, RefreshOutline, FilterOutline, CopyOutline, TrashOutline } from '@vicons/ionicons5';
+import { NInput, NIcon, NTooltip, NButton, NDropdown, useMessage, NModal } from 'naive-ui';
+import { SearchOutline, DocumentTextOutline, TimeOutline, RefreshOutline, CopyOutline, TrashOutline } from '@vicons/ionicons5';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
 import { formatFileSize } from '../../utils/format';
@@ -105,26 +96,16 @@ const layoutStore = useSidebarLayoutStore();
 const message = useMessage();
 const searchText = ref('');
 
-const filterOptions = [
-    { label: '仅显示原始文件', value: 'original' },
-    { label: '显示所有文件', value: 'all' }
-];
-
-const filteredFiles = computed(() => {
+const displayFiles = computed(() => {
   let list = store.files;
   
-  // 1. Filter by mode
-  if (store.fileFilterMode === 'original') {
-      list = list.filter(f => !isDerivedFile(f.logical_path));
-  }
-
-  // 2. Filter by search
+  // Filter by search
   if (searchText.value) {
     const lower = searchText.value.toLowerCase();
     list = list.filter(f => f.logical_path.toLowerCase().includes(lower));
   }
   
-  // 3. Sort by updated_at desc
+  // Sort by updated_at desc
   return [...list].sort((a, b) => b.updated_at - a.updated_at);
 });
 
@@ -188,7 +169,7 @@ function formatRelativeTime(ts: number) {
 async function selectFile(file: any) {
     await store.selectFile(file);
     // Open Right Drawer for Timeline
-    layoutStore.openRightDrawer('historyTimeline');
+    layoutStore.openRightDrawer('history');
 }
 
 function openFileContextMenu(e: MouseEvent, file: FileRecord) {

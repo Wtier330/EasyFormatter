@@ -27,22 +27,32 @@
 </template>
 
 <script setup lang="ts">
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { NIcon } from 'naive-ui';
+import { isTauriRuntime } from '../../tauri';
 
-// Initialize window instance
-const win = getCurrentWindow();
+let winPromise: Promise<any> | null = null;
+
+async function getWin() {
+  if (!isTauriRuntime()) return null;
+  if (!winPromise) {
+    winPromise = import('@tauri-apps/api/window').then((m) => m.getCurrentWindow());
+  }
+  return await winPromise;
+}
 
 async function minimize() {
-  await win.minimize();
+  const win = await getWin();
+  await win?.minimize();
 }
 
 async function toggleMaximize() {
-  await win.toggleMaximize();
+  const win = await getWin();
+  await win?.toggleMaximize();
 }
 
 async function close() {
-  await win.close();
+  const win = await getWin();
+  await win?.close();
 }
 </script>
 

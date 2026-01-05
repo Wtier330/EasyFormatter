@@ -1,9 +1,7 @@
 import { ref } from 'vue';
-import { getName, getVersion, getTauriVersion } from '@tauri-apps/api/app';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { open } from '@tauri-apps/plugin-shell';
 import { useMessage } from 'naive-ui';
 import { aboutConfig } from '../config/about.config';
+import { isTauriRuntime } from '../tauri';
 
 export interface AppInfo {
   name: string;
@@ -29,16 +27,19 @@ export function useAbout() {
 
   const initInfo = async () => {
     try {
-      // Get App Info via Tauri API
-      const [name, ver, tVer] = await Promise.allSettled([
-        getName(),
-        getVersion(),
-        getTauriVersion()
-      ]);
+      if (isTauriRuntime()) {
+        const { getName, getVersion, getTauriVersion } = await import('@tauri-apps/api/app');
 
-      if (name.status === 'fulfilled') appInfo.value.name = name.value;
-      if (ver.status === 'fulfilled') appInfo.value.version = ver.value;
-      if (tVer.status === 'fulfilled') appInfo.value.tauriVersion = tVer.value;
+        const [name, ver, tVer] = await Promise.allSettled([
+          getName(),
+          getVersion(),
+          getTauriVersion()
+        ]);
+
+        if (name.status === 'fulfilled') appInfo.value.name = name.value;
+        if (ver.status === 'fulfilled') appInfo.value.version = ver.value;
+        if (tVer.status === 'fulfilled') appInfo.value.tauriVersion = tVer.value;
+      }
 
       // Get OS Info via Navigator (Basic fallback)
       if (typeof navigator !== 'undefined') {
@@ -71,7 +72,14 @@ export function useAbout() {
     ].join('\n');
 
     try {
-      await writeText(text);
+      if (isTauriRuntime()) {
+        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+        await writeText(text);
+        message.success('版本信息已复制到剪贴板');
+        return;
+      }
+
+      await navigator.clipboard.writeText(text);
       message.success('版本信息已复制到剪贴板');
     } catch (e) {
       console.error('Clipboard write failed', e);
@@ -84,7 +92,13 @@ export function useAbout() {
   const openLink = async (url: string) => {
     if (!url) return;
     try {
-      await open(url);
+      if (isTauriRuntime()) {
+        const { open } = await import('@tauri-apps/plugin-shell');
+        await open(url);
+        return;
+      }
+
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch (e) {
       console.error('Failed to open link', e);
       message.error('无法打开链接');

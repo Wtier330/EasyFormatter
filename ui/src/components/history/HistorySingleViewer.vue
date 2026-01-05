@@ -43,6 +43,16 @@
           size="small"
           type="default"
           secondary
+          @click="layoutStore.toggleRightDrawer('history')"
+        >
+          <template #icon><n-icon><TimeOutline /></n-icon></template>
+          版本历史
+        </n-button>
+
+        <n-button
+          size="small"
+          type="default"
+          secondary
           :disabled="!record"
           @click="handleCopyRestore"
         >
@@ -81,7 +91,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import * as monaco from 'monaco-editor';
 import { NButton, NIcon, NPopconfirm, NTag, NTooltip, useMessage } from 'naive-ui';
-import { ArrowUndoOutline, CopyOutline } from '@vicons/ionicons5';
+import { ArrowUndoOutline, CopyOutline, TimeOutline } from '@vicons/ionicons5';
 import { useAppStore } from '../../stores/app';
 import { historyService, type VersionSummary } from '../../services/historyService';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';

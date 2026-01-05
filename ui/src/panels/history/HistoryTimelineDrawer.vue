@@ -140,8 +140,8 @@
                     />
                   </div>
                 </div>
-                <div class="ar-time">{{ formatTime(record.ts) }}</div>
                 <div class="ar-op">{{ getOpLabel(record.op_type) }}</div>
+                <div class="ar-time">{{ getRelativeTime(record.ts) }}</div>
                 <div class="ar-size">{{ formatFileSize(record.payload_size) }}</div>
                 
                 <!-- Audit Actions (Show on hover/active) -->
@@ -379,8 +379,8 @@ function handleInspect(record: VersionSummary) {
 
 /* Recovery Section (Layer 1) */
 .recovery-section {
-    background: #fff0f0; /* Light red background for emergency feel */
-    border: 1px solid #ffd0d0;
+    background: #e0ffe5; /* Light red background for emergency feel */
+    border: 1px solid #e0ffe5;
     border-radius: 8px;
     padding: 12px;
 }
@@ -388,7 +388,7 @@ function handleInspect(record: VersionSummary) {
 .section-title {
     font-size: 12px;
     font-weight: bold;
-    color: #d03050;
+    color: #597cee;
     margin-bottom: 8px;
     display: flex;
     align-items: center;

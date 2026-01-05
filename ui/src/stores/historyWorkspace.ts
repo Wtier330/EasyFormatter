@@ -12,8 +12,6 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
   const compareMode = ref(false);
   const inspectMode = ref(false); // New: True when Overlay is open
   const compareBaseMode = ref<'latest' | 'previous'>('latest');
-  const recordFilterMode = ref<'key' | 'all'>('key');
-  const fileFilterMode = ref<'original' | 'all'>('original');
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -297,8 +295,6 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     top_files: [string, number][];
   } | null>(null);
 
-  const filterKeyOperations = ref(true); // Default true
-
   async function fetchStats() {
       try {
           stats.value = await historyService.getStats();
@@ -346,10 +342,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     loading,
     error,
     stats,
-    filterKeyOperations,
     compareBaseMode,
-    recordFilterMode,
-    fileFilterMode,
     setCompareBaseMode,
     enterHistoryMode,
     exitHistoryMode,

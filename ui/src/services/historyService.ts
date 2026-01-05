@@ -1,9 +1,19 @@
-import { invoke } from '@tauri-apps/api/core';
-
 type NoiseRecordMode = 'disable' | 'redirect' | 'allow';
 
 const noiseRecordMode: NoiseRecordMode =
   (import.meta.env.VITE_HISTORY_NOISE_RECORD_MODE as NoiseRecordMode) ?? 'disable';
+
+function isTauriRuntime() {
+  return typeof window !== 'undefined' && !!((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__);
+}
+
+async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>) {
+  if (!isTauriRuntime()) {
+    throw new Error('当前运行环境不支持 Tauri API');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return await invoke<T>(cmd, args);
+}
 
 function getNullSinkPath(): string {
   if (typeof navigator !== 'undefined') {
@@ -67,7 +77,7 @@ export const historyService = {
    */
   async healthCheck(): Promise<HistoryHealthCheckResult> {
     try {
-      return await invoke<HistoryHealthCheckResult>('history_health_check');
+      return await invokeTauri<HistoryHealthCheckResult>('history_health_check');
     } catch (e) {
       console.error('History health check failed:', e);
       return { enabled: false, db_path: null, status: String(e) };
@@ -79,7 +89,7 @@ export const historyService = {
    */
   async listFiles(): Promise<FileRecord[]> {
     try {
-      return await invoke<FileRecord[]>('history_list_files');
+      return await invokeTauri<FileRecord[]>('history_list_files');
     } catch (e) {
       console.warn('List history files failed (feature might be disabled):', e);
       return [];
@@ -91,7 +101,7 @@ export const historyService = {
    */
   async listVersions(fileId: number): Promise<VersionSummary[]> {
     try {
-      return await invoke<VersionSummary[]>('history_list_versions', { fileId });
+      return await invokeTauri<VersionSummary[]>('history_list_versions', { fileId });
     } catch (e) {
       console.warn(`List versions failed for file ${fileId}:`, e);
       return [];
@@ -115,7 +125,7 @@ export const historyService = {
           filePath = getNullSinkPath();
         }
       }
-      return await invoke<number>('history_record_stub', { filePath, content, note, opType });
+      return await invokeTauri<number>('history_record_stub', { filePath, content, note, opType });
     } catch (e) {
       // 失败不应阻断主流程，仅打日志
       console.warn('Record checkpoint failed:', e);
@@ -130,7 +140,7 @@ export const historyService = {
     * @returns 新文件路径
     */
    async copyRestore(versionId: number, targetDir?: string): Promise<string> {
-     return await invoke<string>('history_copy_restore', { versionId, targetDir });
+     return await invokeTauri<string>('history_copy_restore', { versionId, targetDir });
    },
 
    /**
@@ -138,34 +148,34 @@ export const historyService = {
     * @param versionId 历史版本ID
     */
    async getVersionContent(versionId: number): Promise<string> {
-     return await invoke<string>('history_get_version_content', { versionId });
+     return await invokeTauri<string>('history_get_version_content', { versionId });
    },
 
    async materialize(versionId: number): Promise<{ content: string, hash: string }> {
-    return await invoke<{ content: string, hash: string }>('history_materialize', { versionId });
+    return await invokeTauri<{ content: string, hash: string }>('history_materialize', { versionId });
   },
 
   async getStats(): Promise<any> {
-    return await invoke('history_stats');
+    return await invokeTauri('history_stats');
   },
 
   async gc(maxDays?: number, maxRecords?: number): Promise<{ removed_count: number, removed_bytes: number }> {
-    return await invoke('history_gc', { maxDays, maxRecords });
+    return await invokeTauri('history_gc', { maxDays, maxRecords });
   },
 
   async deleteVersions(fileId: number, versionIds: number[]): Promise<HistoryDeleteResult> {
-    return await invoke<HistoryDeleteResult>('history_delete_versions', { fileId, versionIds });
+    return await invokeTauri<HistoryDeleteResult>('history_delete_versions', { fileId, versionIds });
   },
 
   async deleteFileHistory(fileId: number): Promise<HistoryDeleteResult> {
-    return await invoke<HistoryDeleteResult>('history_delete_file_history', { fileId });
+    return await invokeTauri<HistoryDeleteResult>('history_delete_file_history', { fileId });
   },
 
   /**
    * 获取调试信息
    */
   async getDebugDbInfo(): Promise<DebugDbInfo> {
-    return await invoke('history_debug_db_info');
+    return await invokeTauri('history_debug_db_info');
   }
 };
 

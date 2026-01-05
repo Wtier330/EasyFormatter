@@ -2,17 +2,6 @@
   <div class="history-timeline">
     <div class="header">
         <span>历史记录</span>
-        <div class="header-actions">
-           <n-tooltip trigger="hover">
-              <template #trigger>
-                 <n-switch v-model:value="store.filterKeyOperations" size="small">
-                    <template #checked>关键</template>
-                    <template #unchecked>全部</template>
-                 </n-switch>
-              </template>
-              只显示 保存/回滚/格式化/压缩/变换
-           </n-tooltip>
-        </div>
     </div>
     <div class="timeline-content">
       <div v-if="historyGroups.length > 0">
@@ -65,7 +54,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { NTag, NEmpty, NSwitch, NTooltip, NDivider } from 'naive-ui';
+import { NTag, NEmpty, NDivider } from 'naive-ui';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import type { VersionSummary } from '../../services/historyService';
 
@@ -73,16 +62,8 @@ const store = useHistoryWorkspaceStore();
 
 const historyGroups = computed(() => {
   const groups: Record<string, VersionSummary[]> = {};
-  
-  // Filter
-  const filtered = store.records.filter(r => {
-      if (!store.filterKeyOperations) return true;
-      // Key operations: save, rollback, format, compress, transform
-      const keyOps = ['save', 'rollback', 'format', 'compress', 'transform'];
-      return keyOps.includes(r.op_type);
-  });
-  
-  filtered.forEach(r => {
+
+  store.records.forEach(r => {
     const date = new Date(r.ts * 1000).toLocaleDateString();
     if (!groups[date]) groups[date] = [];
     groups[date].push(r);

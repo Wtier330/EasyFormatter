@@ -22,11 +22,11 @@ export function useKeyboardShortcuts(options: { registerListeners?: boolean } = 
 
   async function handleOpen() {
     const path = await commands.pickFile();
-    if (path) {
-      const tab = appStore.ensureTab(path);
-      appStore.activeTabId = tab.id;
-      await configStore.loadFile(path);
-    }
+    const resolvedPath = Array.isArray(path) ? path[0] : path;
+    if (!resolvedPath) return;
+    const tab = appStore.ensureTab(resolvedPath);
+    appStore.activeTabId = tab.id;
+    await configStore.loadFile(resolvedPath);
   }
 
   function handleNew() {

@@ -11,6 +11,27 @@
       @close="store.closeCompare"
     >
         <template #extra>
+            <n-button
+              quaternary
+              circle
+              size="small"
+              :disabled="!canSelectNewer"
+              @click="selectNewer"
+              title="上一条"
+            >
+              <template #icon><n-icon><ChevronUpOutline /></n-icon></template>
+            </n-button>
+            <n-button
+              quaternary
+              circle
+              size="small"
+              :disabled="!canSelectOlder"
+              @click="selectOlder"
+              title="下一条"
+            >
+              <template #icon><n-icon><ChevronDownOutline /></n-icon></template>
+            </n-button>
+
             <n-switch v-model:value="showPathList" size="small">
                 <template #checked>列表</template>
                 <template #unchecked>列表</template>
@@ -46,11 +67,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import * as monaco from 'monaco-editor';
 import * as Diff from 'diff';
 import * as jsonpatch from 'fast-json-patch';
-import { NTag, NSwitch } from 'naive-ui';
+import { NButton, NIcon, NTag, NSwitch } from 'naive-ui';
+import { ChevronDownOutline, ChevronUpOutline } from '@vicons/ionicons5';
 import { safeParse } from '../../utils/json';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import CompareBar from './CompareBar.vue';
@@ -73,6 +95,26 @@ const changeIndex = ref(-1);
 const showPathList = ref(true);
 
 const jsonChanges = ref<any[]>([]);
+
+const selectedIndex = computed(() => {
+  if (!store.selectedRecord) return -1;
+  return store.records.findIndex(r => r.id === store.selectedRecord?.id);
+});
+
+const canSelectNewer = computed(() => selectedIndex.value > 0);
+const canSelectOlder = computed(() => selectedIndex.value >= 0 && selectedIndex.value < store.records.length - 1);
+
+function selectNewer() {
+  const idx = selectedIndex.value;
+  if (idx <= 0) return;
+  store.selectRecord(store.records[idx - 1]);
+}
+
+function selectOlder() {
+  const idx = selectedIndex.value;
+  if (idx < 0 || idx >= store.records.length - 1) return;
+  store.selectRecord(store.records[idx + 1]);
+}
 
 onMounted(() => {
   if (container.value) {
@@ -355,6 +397,19 @@ function navChange(dir: number) {
     text-align: center;
     color: #ccc;
     font-size: 12px;
+}
+
+@media (max-width: 1100px), (max-height: 760px) {
+  .wb-body {
+    flex-direction: column;
+  }
+
+  .path-list {
+    width: 100%;
+    height: 200px;
+    border-left: none;
+    border-top: 1px solid #eee;
+  }
 }
 
 :deep(.diff-line-added) {

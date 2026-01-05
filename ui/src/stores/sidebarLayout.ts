@@ -17,7 +17,7 @@ export const useSidebarLayoutStore = defineStore('sidebarLayout', () => {
   // Right Drawer State
   const activeDrawerKey = ref<string | null>(null);
   const drawerVisible = ref(false);
-  const drawerWidth = ref(300);
+  const drawerWidth = ref(360);
 
   // Actions
   function ensureVisible() {
@@ -43,6 +43,11 @@ export const useSidebarLayoutStore = defineStore('sidebarLayout', () => {
 
     if (!isCollapsed.value) {
       ensureVisible();
+    }
+
+    if (key !== 'history') {
+      drawerVisible.value = false;
+      activeDrawerKey.value = null;
     }
   }
 
