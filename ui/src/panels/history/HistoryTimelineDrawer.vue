@@ -1,21 +1,45 @@
 <template>
-  <div class="history-timeline-drawer">
+  <div class="history-timeline-drawer" :class="{ 'delete-mode': isDeleteMode }">
     <div class="header">
       <div class="title">版本历史</div>
       <div class="actions">
-         <n-switch v-model:value="store.recordFilterMode" size="small" checked-value="key" unchecked-value="all">
-            <template #checked>关键</template>
-            <template #unchecked>全部</template>
-         </n-switch>
-         <n-divider vertical />
-         <n-tooltip>
-           <template #trigger>
-             <n-button size="tiny" circle @click="refresh">
-               <template #icon><n-icon><RefreshOutline /></n-icon></template>
-             </n-button>
-           </template>
-           刷新
-         </n-tooltip>
+        <!-- 移除复杂筛选，仅保留刷新 -->
+        <n-tooltip>
+          <template #trigger>
+            <n-button size="tiny" circle @click="refresh">
+              <template #icon><n-icon><RefreshOutline /></n-icon></template>
+            </n-button>
+          </template>
+          刷新
+        </n-tooltip>
+
+        <n-tooltip>
+          <template #trigger>
+            <n-button size="tiny" circle :type="isDeleteMode ? 'error' : 'default'" @click="toggleDeleteMode">
+              <template #icon><n-icon><TrashOutline /></n-icon></template>
+            </n-button>
+          </template>
+          批量删除
+        </n-tooltip>
+
+        <n-tooltip>
+          <template #trigger>
+            <n-button size="tiny" circle @click="layoutStore.closeRightDrawer">
+              <template #icon><n-icon><CloseOutline /></n-icon></template>
+            </n-button>
+          </template>
+          关闭
+        </n-tooltip>
+
+        <n-button
+          v-if="isDeleteMode && selectedDeleteIds.length > 0"
+          size="tiny"
+          type="error"
+          secondary
+          @click="requestDelete(selectedDeleteIds)"
+        >
+          删除 ({{ selectedDeleteIds.length }})
+        </n-button>
       </div>
     </div>
     
@@ -23,129 +47,169 @@
       <div v-if="!store.activeFile" class="empty-state">
         请先选择左侧文件
       </div>
-      <div v-else-if="filteredRecords.length === 0" class="empty-state">
-        暂无{{ store.recordFilterMode === 'key' ? '关键' : '' }}历史记录
+      <div v-else-if="store.records.length === 0" class="empty-state">
+        暂无历史记录
       </div>
-      <div v-else class="timeline-list">
-         <div 
-           v-for="record in filteredRecords" 
-           :key="record.id" 
-           class="timeline-card"
-           :class="{ 
-             active: store.selectedRecord?.id === record.id,
-             checkpoint: record.is_checkpoint,
-             rollback: record.op_type === 'rollback'
-           }"
-           @click="selectRecord(record)"
-         >
-            <div class="tc-header">
-               <n-tag size="tiny" :type="getOpTagType(record)" :bordered="false" class="op-tag">
-                  {{ getOpLabel(record.op_type) }}
-               </n-tag>
-               <span class="tc-time-rel">{{ getRelativeTime(record.ts) }}</span>
-            </div>
-            
-            <div class="tc-body">
-               <div class="tc-info-row">
-                  <span class="tc-time-exact">{{ formatTime(record.ts) }}</span>
-               </div>
-               <div class="tc-info-row">
-                  <span class="tc-size">Size: {{ formatFileSize(record.payload_size) }}</span>
-                  <span class="tc-change-placeholder" title="变更详情请点击预览">
-                    <!-- Placeholder for diff stats -->
-                  </span>
-               </div>
-               <div class="tc-note" v-if="record.note">
-                 {{ record.note }}
-               </div>
-            </div>
-
-            <!-- Active Actions -->
-            <div class="tc-actions" v-if="store.selectedRecord?.id === record.id">
-                <n-button 
-                    size="tiny" 
+      <div v-else class="history-container">
+        
+        <!-- Layer 1: Recovery Zone (Emergency) -->
+        <div class="recovery-section" v-if="recommendedRecords.length > 0">
+           <div class="section-title">
+              <n-icon class="icon"><AlertCircleOutline /></n-icon>
+              最近可恢复状态
+           </div>
+           <div class="recovery-list">
+             <div 
+                v-for="record in recommendedRecords" 
+                :key="record.id" 
+                class="recovery-card"
+                :class="{ active: store.selectedRecord?.id === record.id }"
+                @click="selectRecord(record)"
+              >
+                  <n-button
+                    class="row-delete"
+                    size="tiny"
+                    circle
+                    quaternary
                     type="error"
-                    @click.stop="handleOverwrite(record)" 
-                    style="margin-right: 8px"
-                >
-                    覆盖还原
-                </n-button>
-                <n-button 
-                    size="tiny" 
-                    secondary 
-                    type="primary" 
-                    @click.stop="handleCopyRestore(record)"
-                >
-                    复制还原
-                </n-button>
-            </div>
-            
-            <!-- Type Badge -->
-            <div class="tc-badge" v-if="getRecordTypeBadge(record)">
-                {{ getRecordTypeBadge(record) }}
-            </div>
-         </div>
+                    @click.stop="requestDelete([record.id])"
+                    title="删除该条记录（会连带删除较新记录）"
+                  >
+                    <template #icon><n-icon><TrashOutline /></n-icon></template>
+                  </n-button>
+                  <div class="rc-left">
+                     <div class="rc-reason">
+                        <n-tag size="tiny" :type="getOpTagType(record)" :bordered="false">
+                           {{ getOpLabel(record.op_type) }}
+                        </n-tag>
+                        <span class="rc-time">{{ getRelativeTime(record.ts) }}</span>
+                     </div>
+                     <div class="rc-meta">
+                        {{ formatTime(record.ts) }}
+                     </div>
+                  </div>
+                  <div class="rc-action">
+                      <n-button 
+                        size="small" 
+                        type="default" 
+                        class="inspect-btn"
+                        @click.stop="handleInspect(record)"
+                      >
+                         详情
+                      </n-button>
+                  </div>
+              </div>
+           </div>
+        </div>
+
+        <!-- Layer 2: Audit Zone (Full History) -->
+        <div class="audit-section">
+           <div class="audit-header" @click="isAuditExpanded = !isAuditExpanded">
+              <div class="audit-title">完整历史记录 ({{ store.records.length }})</div>
+              <n-icon :component="ChevronDown" :class="{ rotated: !isAuditExpanded }" />
+           </div>
+           
+           <div class="audit-list" v-show="isAuditExpanded">
+             <div 
+               v-for="record in store.records" 
+               :key="record.id" 
+               class="audit-row"
+               :class="{ 
+                 active: store.selectedRecord?.id === record.id,
+                 checkpoint: record.is_checkpoint,
+                 rollback: record.op_type === 'rollback'
+               }"
+               @click="selectRecord(record)"
+             >
+                <div class="ar-left">
+                  <n-button
+                    class="row-delete"
+                    size="tiny"
+                    circle
+                    quaternary
+                    type="error"
+                    @click.stop="requestDelete([record.id])"
+                    title="删除该条记录（会连带删除较新记录）"
+                  >
+                    <template #icon><n-icon><TrashOutline /></n-icon></template>
+                  </n-button>
+                  <div v-if="isDeleteMode" class="ar-checkbox" @click.stop>
+                    <n-checkbox
+                      :checked="selectedDeleteIds.includes(record.id)"
+                      @update:checked="(v) => toggleDeleteSelection(record.id, v)"
+                    />
+                  </div>
+                </div>
+                <div class="ar-time">{{ formatTime(record.ts) }}</div>
+                <div class="ar-op">{{ getOpLabel(record.op_type) }}</div>
+                <div class="ar-size">{{ formatFileSize(record.payload_size) }}</div>
+                
+                <!-- Audit Actions (Show on hover/active) -->
+                <div class="ar-actions" v-if="store.selectedRecord?.id === record.id">
+                   <n-button 
+                       size="tiny" 
+                       type="default"
+                       @click.stop="handleInspect(record)"
+                   >
+                       查看详情
+                   </n-button>
+                </div>
+             </div>
+           </div>
+        </div>
+
       </div>
     </div>
   </div>
 
-    <n-modal
-      v-model:show="showOverwriteConfirm"
-      preset="dialog"
-      title="确认覆盖还原"
-      content="这会覆盖现有的文件，是否继续？"
-      positive-text="确定"
-      negative-text="取消"
-      @positive-click="confirmOverwrite"
-      @negative-click="showOverwriteConfirm = false"
-    />
+  <n-modal
+    v-model:show="showDeleteConfirm"
+    preset="dialog"
+    title="确认删除历史记录"
+    :content="deleteConfirmText"
+    positive-text="删除"
+    negative-text="取消"
+    @positive-click="confirmDelete"
+    @negative-click="showDeleteConfirm = false"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, watch, ref } from 'vue';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
-import { useAppStore } from '../../stores/app';
 import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
-import { useConfigStore } from '../../stores/config';
-import { NButton, NIcon, NTooltip, NTag, NSwitch, NDivider, useMessage, NModal } from 'naive-ui';
-import { RefreshOutline } from '@vicons/ionicons5';
+import { NButton, NIcon, NTooltip, NTag, useMessage, NModal, NCheckbox } from 'naive-ui';
+import { RefreshOutline, AlertCircleOutline, ChevronDown, TrashOutline, CloseOutline } from '@vicons/ionicons5';
 import { formatFileSize } from '../../utils/format';
-import { historyService, type VersionSummary } from '../../services/historyService';
-import { commands } from '../../tauri';
+import type { VersionSummary } from '../../services/historyService';
 
 const store = useHistoryWorkspaceStore();
-const appStore = useAppStore();
 const layoutStore = useSidebarLayoutStore();
-const configStore = useConfigStore();
 const message = useMessage();
 
-const recordToOverwrite = ref<VersionSummary | null>(null);
-const showOverwriteConfirm = ref(false);
+const isAuditExpanded = ref(false); // Default collapsed
+const isDeleteMode = ref(false);
+const selectedDeleteIds = ref<number[]>([]);
+const showDeleteConfirm = ref(false);
+const deleteCandidateIds = ref<number[]>([]);
 
-const filteredRecords = computed(() => {
-    if (store.recordFilterMode === 'all') {
-        return store.records;
-    }
-    // Key mode: Checkpoint, Rollback, Copy, Save
-    return store.records.filter(r => {
-        if (r.is_checkpoint) return true;
-        if (['rollback', 'copy_restore', 'save'].includes(r.op_type)) return true;
-        return false;
-    });
+// Layer 1 Logic: Recommended Records
+// Criteria: Top 3 recent 'save' or 'checkpoint'
+const recommendedRecords = computed(() => {
+    return store.records
+        .filter(r => ['save', 'checkpoint'].includes(r.op_type) || r.is_checkpoint)
+        // Sort desc (already sorted usually, but ensure)
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, 3);
 });
 
-// Watch filter change to ensure selection visibility
-watch(() => store.recordFilterMode, (newMode) => {
-    if (newMode === 'key' && store.selectedRecord) {
-        // If selected record is filtered out, select the nearest visible one?
-        // Or just keep it but it won't be in the list (confusing).
-        // Requirement: "若选中记录被过滤掉，给提示并自动选中最近一条可见记录。"
-        const isVisible = filteredRecords.value.find(r => r.id === store.selectedRecord?.id);
-        if (!isVisible && filteredRecords.value.length > 0) {
-            message.info('当前选中记录已被过滤，自动切换至最近可见记录');
-            store.selectRecord(filteredRecords.value[0]);
-        }
-    }
+// Watch file change to reset state
+watch(() => store.activeFile, () => {
+    isAuditExpanded.value = false;
+    isDeleteMode.value = false;
+    selectedDeleteIds.value = [];
+    showDeleteConfirm.value = false;
+    deleteCandidateIds.value = [];
 });
 
 function formatTime(ts: number) {
@@ -184,13 +248,6 @@ function getOpTagType(record: VersionSummary) {
     return 'default';
 }
 
-function getRecordTypeBadge(record: VersionSummary) {
-    if (record.op_type === 'rollback') return 'ROLLBACK';
-    if (record.op_type === 'copy_restore') return 'COPY';
-    if (record.is_checkpoint) return 'CHECKPOINT';
-    return null;
-}
-
 function selectRecord(record: VersionSummary) {
   store.selectRecord(record);
 }
@@ -201,55 +258,76 @@ function refresh() {
   }
 }
 
-function handleOverwrite(record: VersionSummary) {
-    recordToOverwrite.value = record;
-    showOverwriteConfirm.value = true;
+function toggleDeleteMode() {
+  isDeleteMode.value = !isDeleteMode.value;
+  if (isDeleteMode.value) {
+    isAuditExpanded.value = true;
+  }
+  if (!isDeleteMode.value) {
+    selectedDeleteIds.value = [];
+  }
 }
 
-async function confirmOverwrite() {
-    if (!recordToOverwrite.value) return;
-    try {
-        await store.overwriteRestore(recordToOverwrite.value);
-        message.success('覆盖还原成功');
-    } catch (e) {
-        message.error(`覆盖还原失败: ${e}`);
-    } finally {
-        showOverwriteConfirm.value = false;
-        recordToOverwrite.value = null;
-    }
+function toggleDeleteSelection(id: number, checked: boolean) {
+  const curr = selectedDeleteIds.value;
+  if (checked) {
+    if (!curr.includes(id)) selectedDeleteIds.value = [...curr, id];
+  } else {
+    selectedDeleteIds.value = curr.filter(x => x !== id);
+  }
 }
 
-async function handleCopyRestore(record: VersionSummary) {
-    try {
-        const path = await store.copyRestoreSelectedVersion();
-        if (path) {
-            message.success(`已复制还原到: ${path}`);
-            
-            // 1. Add to recent files
-            try {
-                const stats = await commands.stat(path);
-                // @ts-ignore
-                const mtime = stats.mtime ? new Date(stats.mtime).getTime() : Date.now();
-                appStore.addRecentFile(path, stats.size, mtime);
-            } catch (err) {
-                console.error("Failed to stat new file", err);
-                appStore.addRecentFile(path, 0, Date.now());
-            }
+function computeDeletePlan(ids: number[]) {
+  if (ids.length === 0) return null;
+  const idSet = new Set(ids);
+  let boundary = -1;
+  for (let i = 0; i < store.records.length; i++) {
+    if (idSet.has(store.records[i].id)) boundary = Math.max(boundary, i);
+  }
+  if (boundary < 0) return null;
+  const affected = store.records.slice(0, boundary + 1);
+  const removedBytes = affected.reduce((acc, r) => acc + r.payload_size, 0);
+  return {
+    removedCount: affected.length,
+    removedBytes,
+    newest: affected[0],
+    oldest: affected[affected.length - 1]
+  };
+}
 
-            // 2. Switch panel
-            layoutStore.setActivePanel('files');
-            
-            // 3. Open tab
-            const name = path.split(/[/\\]/).pop() || path;
-            const tab = appStore.ensureTab(path, name);
-            appStore.setActive(tab.id);
-            
-            // 4. Load content (highlights file)
-            await configStore.loadFile(path);
-        }
-    } catch (e) {
-        message.error(`复制还原失败: ${e}`);
+const deleteConfirmText = computed(() => {
+  const plan = computeDeletePlan(deleteCandidateIds.value);
+  if (!plan) return '未找到可删除的记录。';
+  return `将删除 ${plan.removedCount} 条记录（约 ${formatFileSize(plan.removedBytes)}，从 ${formatTime(plan.newest.ts)} 到 ${formatTime(plan.oldest.ts)}），以保证历史链完整。此操作不可撤销。`;
+});
+
+function requestDelete(ids: number[]) {
+  deleteCandidateIds.value = ids;
+  showDeleteConfirm.value = true;
+}
+
+async function confirmDelete() {
+  try {
+    const res = await store.deleteVersions(deleteCandidateIds.value);
+    if (res) {
+      message.success(`已删除 ${res.removed_count} 条记录（约 ${formatFileSize(res.removed_bytes)}）`);
+    } else {
+      message.success('已删除历史记录');
     }
+  } catch (e) {
+    message.error(`删除失败: ${e}`);
+  } finally {
+    showDeleteConfirm.value = false;
+    deleteCandidateIds.value = [];
+    selectedDeleteIds.value = [];
+    isDeleteMode.value = false;
+  }
+}
+
+function handleInspect(record: VersionSummary) {
+    store.selectRecord(record);
+    // @ts-ignore
+    store.enterInspectMode();
 }
 </script>
 
@@ -280,6 +358,8 @@ async function handleCopyRestore(record: VersionSummary) {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .content {
@@ -295,108 +375,254 @@ async function handleCopyRestore(record: VersionSummary) {
   font-size: 13px;
 }
 
-.timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.history-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.timeline-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 10px;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.2s;
-  overflow: hidden;
+/* Recovery Section (Layer 1) */
+.recovery-section {
+    background: #fff0f0; /* Light red background for emergency feel */
+    border: 1px solid #ffd0d0;
+    border-radius: 8px;
+    padding: 12px;
 }
 
-.timeline-card:hover {
-  border-color: #18a058;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+.section-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #d03050;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.timeline-card.active {
-  border-color: #18a058;
-  background-color: #f0f9f4;
-  box-shadow: 0 0 0 1px #18a058 inset;
+.recovery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.timeline-card.checkpoint {
-    border-left: 3px solid #f0a020;
-}
-
-.timeline-card.rollback {
-    border-left: 3px solid #d03050;
-}
-
-.tc-header {
+.recovery-card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.tc-time-rel {
-    font-size: 12px;
-    color: #666;
-    font-weight: 500;
+.row-delete {
+  flex-shrink: 0;
+  margin-right: 6px;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.op-tag {
-    font-weight: bold;
+.delete-mode .row-delete,
+.recovery-card:hover .row-delete,
+.recovery-card.active .row-delete,
+.audit-row:hover .row-delete,
+.audit-row.active .row-delete {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.tc-body {
+.recovery-card:hover {
+    border-color: #d03050;
+    box-shadow: 0 2px 8px rgba(208, 48, 80, 0.1);
+}
+
+.recovery-card.active {
+    border-color: #d03050;
+    background-color: #fff8f8;
+}
+
+.rc-left {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
 }
 
-.tc-info-row {
+.rc-reason {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rc-time {
+    font-weight: bold;
+    color: #333;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rc-meta {
+    font-size: 11px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rc-action {
+    /* Ensure action is prominent */
+}
+
+/* Audit Section (Layer 2) */
+.audit-section {
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+}
+
+.audit-header {
     display: flex;
     justify-content: space-between;
-    font-size: 11px;
-    color: #999;
+    align-items: center;
+    padding: 8px 4px;
+    cursor: pointer;
+    color: #666;
+    font-size: 12px;
+    user-select: none;
 }
 
-.tc-size {
-    font-family: monospace;
+.audit-header:hover {
+    color: #333;
 }
 
-.tc-note {
-    margin-top: 6px;
-    font-size: 11px;
-    color: #555;
-    background: #f5f5f5;
-    padding: 4px 6px;
-    border-radius: 4px;
+.rotated {
+    transform: rotate(-90deg);
+    transition: transform 0.2s;
 }
 
-.tc-actions {
-    margin-top: 8px;
+.audit-list {
     display: flex;
-    justify-content: flex-end;
-    padding-top: 8px;
-    border-top: 1px solid #eee;
+    flex-direction: column;
+    gap: 1px; /* Very dense */
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
 }
 
-.tc-badge {
-    position: absolute;
-    right: -15px;
-    top: 5px;
-    background: #eee;
+.audit-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 1px solid #f5f5f5;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    min-width: 0;
+}
+
+.ar-left {
+  display: flex;
+  align-items: center;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.ar-checkbox {
+  margin-left: 4px;
+}
+
+.audit-row:hover {
+    background: #f9f9f9;
+}
+
+.audit-row.active {
+    background: #eef9f2;
+    color: #333;
+}
+
+.ar-time {
+    flex: 0 1 120px;
+    min-width: 92px;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ar-op {
+    flex: 0 1 60px;
+    min-width: 52px;
+    max-width: 80px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ar-size {
+    flex: 1;
     color: #999;
-    font-size: 9px;
-    padding: 2px 15px;
-    transform: rotate(45deg);
-    font-weight: bold;
-    pointer-events: none;
-    opacity: 0.5;
+    min-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.timeline-card.active .tc-badge {
-    opacity: 0.8;
+.ar-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .ar-time {
+    flex-basis: 104px;
+    min-width: 84px;
+  }
+
+  .ar-op {
+    flex-basis: 56px;
+    min-width: 48px;
+  }
+}
+
+@media (max-width: 560px) {
+  .audit-row {
+    padding: 6px;
+  }
+
+  .ar-time {
+    flex-basis: 92px;
+    min-width: 76px;
+  }
+
+  .ar-op {
+    flex-basis: 52px;
+    min-width: 44px;
+  }
+
+  .ar-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 360px) {
+  .audit-row {
+    font-size: 10px;
+  }
+
+  .ar-left {
+    width: 40px;
+  }
 }
 </style>

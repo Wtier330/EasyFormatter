@@ -316,6 +316,16 @@ pub struct GcResult {
 }
 
 #[command]
+pub fn history_delete_versions(file_id: i64, version_ids: Vec<i64>) -> Result<GcResult, String> {
+    if !is_deployment_mode() { return Err("History disabled".into()); }
+    let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
+    let (removed_count, removed_bytes) = repo
+        .delete_versions_from_latest(file_id, version_ids)
+        .map_err(|e| e.to_string())?;
+    Ok(GcResult { removed_count, removed_bytes })
+}
+
+#[command]
 pub fn history_gc(max_days: Option<i64>, max_records: Option<i64>) -> Result<GcResult, String> {
     if !is_deployment_mode() { return Err("History disabled".into()); }
     let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;

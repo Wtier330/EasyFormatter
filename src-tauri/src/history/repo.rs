@@ -15,6 +15,8 @@ pub trait HistoryRepo {
     // Stats & GC
     fn get_stats(&self) -> Result<HistoryStats>;
     fn gc(&self, max_days: Option<i64>, max_records: Option<i64>) -> Result<(i64, u64)>; // count, bytes
+
+    fn delete_versions_from_latest(&self, file_id: i64, version_ids: Vec<i64>) -> Result<(i64, u64)>; // count, bytes
 }
 
 #[derive(serde::Serialize)]
@@ -372,6 +374,84 @@ impl HistoryRepo for SqliteHistoryRepo {
              // self.conn.execute("VACUUM", [])?; // Risk of timeout.
         }
         
+        Ok((total_deleted, total_bytes))
+    }
+
+    fn delete_versions_from_latest(&self, file_id: i64, version_ids: Vec<i64>) -> Result<(i64, u64)> {
+        if version_ids.is_empty() {
+            return Ok((0, 0));
+        }
+
+        let id_set: std::collections::HashSet<i64> = version_ids.into_iter().collect();
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, payload_size FROM versions WHERE file_id = ?1 ORDER BY ts DESC"
+        )?;
+
+        struct VInfo {
+            id: i64,
+            size: i64,
+        }
+
+        let rows = stmt.query_map(params![file_id], |row| {
+            Ok(VInfo {
+                id: row.get(0)?,
+                size: row.get(1)?,
+            })
+        })?;
+
+        let mut versions: Vec<VInfo> = Vec::new();
+        for r in rows {
+            versions.push(r?);
+        }
+
+        if versions.is_empty() {
+            return Ok((0, 0));
+        }
+
+        let mut boundary_idx: Option<usize> = None;
+        for (idx, v) in versions.iter().enumerate() {
+            if id_set.contains(&v.id) {
+                boundary_idx = Some(boundary_idx.map_or(idx, |b| std::cmp::max(b, idx)));
+            }
+        }
+
+        let Some(boundary) = boundary_idx else {
+            return Ok((0, 0));
+        };
+
+        let mut total_deleted: i64 = 0;
+        let mut total_bytes: u64 = 0;
+
+        for v in versions.iter().take(boundary + 1) {
+            self.conn.execute("DELETE FROM versions WHERE id = ?1", params![v.id])?;
+            total_deleted += 1;
+            total_bytes += v.size as u64;
+        }
+
+        let remaining: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM versions WHERE file_id = ?1",
+            params![file_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        if remaining == 0 {
+            let _ = self.conn.execute("DELETE FROM files WHERE id = ?1", params![file_id]);
+        } else {
+            let latest_ts: Option<i64> = self.conn.query_row(
+                "SELECT MAX(ts) FROM versions WHERE file_id = ?1",
+                params![file_id],
+                |row| row.get(0),
+            ).optional()?;
+
+            if let Some(ts) = latest_ts {
+                let _ = self.conn.execute(
+                    "UPDATE files SET updated_at = ?1 WHERE id = ?2",
+                    params![ts, file_id],
+                );
+            }
+        }
+
         Ok((total_deleted, total_bytes))
     }
 }

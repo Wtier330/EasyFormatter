@@ -1,4 +1,4 @@
-import { type Component, markRaw } from 'vue';
+import { type Component } from 'vue';
 
 export interface PanelDefinition {
   key: string;

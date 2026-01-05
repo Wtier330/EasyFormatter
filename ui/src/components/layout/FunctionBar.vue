@@ -1,5 +1,5 @@
 <template>
-  <div class="function-bar">
+  <div class="function-bar" v-if="!isHistoryMode">
     <div class="bar-left">
       <n-space :size="8">
         <n-button 
@@ -136,13 +136,19 @@ import { computed, h, onMounted, ref, watch } from 'vue';
 import { NSpace, NButton, NButtonGroup, NIcon, NInput, NDropdown, useDialog, useNotification } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
+import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
 import { commands } from '../../tauri';
 import { readClipboardWithFallback } from '../../utils/clipboard-handlers';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
+const layoutStore = useSidebarLayoutStore();
 const notification = useNotification();
 const dialog = useDialog();
+
+const isHistoryMode = computed(() => {
+  return layoutStore.activePanelKey === 'history';
+});
 
 // Transform Options
 const transformOptions = [

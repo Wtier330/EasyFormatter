@@ -30,6 +30,11 @@ export interface DebugDbInfo {
     file_size: number;
 }
 
+export interface HistoryDeleteResult {
+  removed_count: number;
+  removed_bytes: number;
+}
+
 /**
  * 历史回滚服务 (History Rollback Service)
  * 
@@ -122,6 +127,10 @@ export const historyService = {
 
   async gc(maxDays?: number, maxRecords?: number): Promise<{ removed_count: number, removed_bytes: number }> {
     return await invoke('history_gc', { maxDays, maxRecords });
+  },
+
+  async deleteVersions(fileId: number, versionIds: number[]): Promise<HistoryDeleteResult> {
+    return await invoke<HistoryDeleteResult>('history_delete_versions', { fileId, versionIds });
   },
 
   /**

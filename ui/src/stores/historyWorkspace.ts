@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { historyService, type FileRecord, type VersionSummary } from '../services/historyService';
+import { historyService, type FileRecord, type HistoryDeleteResult, type VersionSummary } from '../services/historyService';
 import { commands } from '../tauri';
 
 export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
@@ -10,6 +10,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
   const records = ref<VersionSummary[]>([]);
   const selectedRecord = ref<VersionSummary | null>(null);
   const compareMode = ref(false);
+  const inspectMode = ref(false); // New: True when Overlay is open
   const compareBaseMode = ref<'latest' | 'previous'>('latest');
   const recordFilterMode = ref<'key' | 'all'>('key');
   const fileFilterMode = ref<'original' | 'all'>('original');
@@ -18,7 +19,9 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
 
   // Content for workbench
   const currentContent = ref('');
+  const currentHash = ref('');
   const compareContent = ref(''); // Content of selected record for comparison
+  const compareHash = ref('');
   let requestSeq = 0;
 
   // Sidebar State
@@ -43,6 +46,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     records.value = [];
     selectedRecord.value = null;
     compareMode.value = false;
+    inspectMode.value = false;
   }
 
   async function loadFiles() {
@@ -62,8 +66,12 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     activeFile.value = file;
     selectedRecord.value = null;
     compareMode.value = false;
+    inspectMode.value = false;
     records.value = [];
     currentContent.value = '';
+    currentHash.value = '';
+    compareContent.value = '';
+    compareHash.value = '';
     compareBaseMode.value = 'latest';
     
     loading.value = true;
@@ -76,8 +84,10 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
           const latest = records.value[0];
           const res = await historyService.materialize(latest.id);
           currentContent.value = res.content;
+          currentHash.value = res.hash;
       } else {
           currentContent.value = "(No history)";
+          currentHash.value = '';
       }
     } catch (e) {
       error.value = String(e);
@@ -87,14 +97,15 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
   }
 
   async function selectRecord(record: VersionSummary) {
+    // If we are in inspect mode, we allow switching records inside the overlay
+    // If not in inspect mode, we just update selection (Preview phase)
+    
     if (selectedRecord.value?.id === record.id && compareBaseMode.value === 'latest') {
-      // 在 latest 基准下，重复点击同一条不必重复加载
-      // 切换基准时会强制刷新
       return;
     }
     
     selectedRecord.value = record;
-    compareMode.value = true;
+    compareMode.value = true; // Still needed for data loading logic
     
     loading.value = true;
     const seq = ++requestSeq;
@@ -103,6 +114,7 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
       const resSelected = await historyService.materialize(record.id);
       if (seq !== requestSeq) return;
       compareContent.value = resSelected.content;
+      compareHash.value = resSelected.hash;
       
       // 2) 基准内容
       if (compareBaseMode.value === 'previous') {
@@ -112,8 +124,10 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
           const resPrev = await historyService.materialize(prev.id);
           if (seq !== requestSeq) return;
           currentContent.value = resPrev.content;
+          currentHash.value = resPrev.hash;
         } else {
           currentContent.value = '';
+          currentHash.value = '';
         }
       } else {
         // latest
@@ -122,8 +136,10 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
           const resLatest = await historyService.materialize(latest.id);
           if (seq !== requestSeq) return;
           currentContent.value = resLatest.content;
+          currentHash.value = resLatest.hash;
         } else {
           currentContent.value = '';
+          currentHash.value = '';
         }
       }
     } catch (e) {
@@ -139,6 +155,18 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     if (selectedRecord.value) {
       await selectRecord(selectedRecord.value);
     }
+  }
+
+  function enterInspectMode() {
+      if (selectedRecord.value) {
+          inspectMode.value = true;
+      }
+  }
+
+  function closeCompare() {
+    inspectMode.value = false;
+    // We don't clear selectedRecord or compareMode to keep state in sidebar
+    // Just close the overlay
   }
 
   async function restoreSelectedVersion() {
@@ -177,11 +205,41 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
           const res = await historyService.materialize(record.id);
           // 2. Overwrite file
           await commands.writeText(activeFile.value.logical_path, res.content);
+
+          await historyService.recordCheckpointStub(
+              activeFile.value.logical_path,
+              res.content,
+              `rollback_from=${record.id}`
+          );
           
-          // 3. Update current content view locally
-          currentContent.value = res.content;
+          const file = activeFile.value;
+          activeFile.value = null;
+          await selectFile(file);
           
           return true;
+      } catch (e) {
+          error.value = String(e);
+          throw e;
+      } finally {
+          loading.value = false;
+      }
+  }
+
+  async function deleteVersions(versionIds: number[]): Promise<HistoryDeleteResult | null> {
+      if (!activeFile.value) return null;
+      if (versionIds.length === 0) return null;
+      loading.value = true;
+      try {
+          const res = await historyService.deleteVersions(activeFile.value.id, versionIds);
+
+          selectedRecord.value = null;
+          compareMode.value = false;
+          inspectMode.value = false;
+
+          const file = activeFile.value;
+          activeFile.value = null;
+          await selectFile(file);
+          return res;
       } catch (e) {
           error.value = String(e);
           throw e;
@@ -253,8 +311,11 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     records,
     selectedRecord,
     compareMode,
+    inspectMode,
     currentContent,
     compareContent,
+    currentHash,
+    compareHash,
     loading,
     error,
     stats,
@@ -268,9 +329,12 @@ export const useHistoryWorkspaceStore = defineStore('historyWorkspace', () => {
     loadFiles,
     selectFile,
     selectRecord,
+    enterInspectMode,
+    closeCompare,
     restoreSelectedVersion,
     overwriteRestore,
     copyRestoreSelectedVersion,
+    deleteVersions,
     fetchStats,
     gc,
     sidebarWidth,

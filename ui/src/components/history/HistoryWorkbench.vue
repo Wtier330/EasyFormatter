@@ -7,10 +7,8 @@
       :stats="stats"
       :loading="store.loading"
       :current-base-mode="store.compareBaseMode"
-      :change-index="changeIndex"
-      :total-changes="changeList.length"
       @update:base-mode="store.setCompareBaseMode"
-      @nav="navChange"
+      @close="store.closeCompare"
     >
         <template #extra>
             <n-switch v-model:value="showPathList" size="small">
@@ -52,8 +50,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import * as monaco from 'monaco-editor';
 import * as Diff from 'diff';
 import * as jsonpatch from 'fast-json-patch';
-import { NTag, NButtonGroup, NButton, NIcon, NDivider, NSwitch } from 'naive-ui';
-import { ChevronUp, ChevronDown } from '@vicons/ionicons5';
+import { NTag, NSwitch } from 'naive-ui';
 import { safeParse } from '../../utils/json';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import CompareBar from './CompareBar.vue';
@@ -131,6 +128,58 @@ function updateContent() {
   }
 }
 
+function computeDiff() {
+  if (!editor) return;
+
+  const baseText = props.currentContent ?? '';
+  const targetText = props.compareContent ?? '';
+
+  const parts = Diff.diffLines(baseText, targetText);
+  const changes: { startLine: number, endLine: number }[] = [];
+
+  let targetLine = 1;
+  let added = 0;
+  let removed = 0;
+
+  const countLines = (value: string) => {
+    if (!value) return 0;
+    const trimmed = value.endsWith('\n') ? value.slice(0, -1) : value;
+    if (!trimmed) return 1;
+    return trimmed.split('\n').length;
+  };
+
+  for (const part of parts) {
+    const lines = countLines(part.value);
+    if (part.added) {
+      added += lines;
+      changes.push({ startLine: targetLine, endLine: targetLine + lines - 1 });
+      targetLine += lines;
+      continue;
+    }
+    if (part.removed) {
+      removed += lines;
+      const anchor = Math.max(1, Math.min(targetLine, editor.getModel()?.getLineCount() ?? 1));
+      changes.push({ startLine: anchor, endLine: anchor });
+      continue;
+    }
+    targetLine += lines;
+  }
+
+  stats.value = { added, removed };
+  changeList.value = changes;
+  changeIndex.value = changes.length > 0 ? 0 : -1;
+
+  const decos = changes.map(c => ({
+    range: new monaco.Range(c.startLine, 1, c.endLine, 1),
+    options: {
+      isWholeLine: true,
+      className: 'diff-line'
+    }
+  }));
+
+  decorations = editor.deltaDecorations(decorations, decos);
+}
+
 function computeJsonDiff() {
     // Current (Latest) vs Compare (Selected)
     // We want patch: Latest -> Selected? 
@@ -168,98 +217,41 @@ function formatVal(v: any) {
 
 function jumpToPath(path: string) {
     if (!editor) return;
-    // Simple logic: Find key in text. 
-    // Better: Use source map / AST. But we don't have it easily.
-    // Fallback: Search for the key string (last segment of path).
-    
+
     const segments = path.split('/').filter(Boolean);
     const key = segments[segments.length - 1];
     
-    if (!key) return; // Root?
+    if (!key) return; 
     
     const model = editor.getModel();
     if (!model) return;
     
-    // Naive search: find matches of key
     const matches = model.findMatches('"' + key + '"', true, false, false, null, true);
-    // Or index? If array path /0.
     
     if (matches.length > 0) {
-        // Just jump to first match for now. 
-        // Real implementation needs robust JSON Path locator.
         const range = matches[0].range;
         editor.revealRangeInCenter(range);
         editor.setSelection(range);
     }
 }
 
-function computeDiff() {
-  if (!editor) return;
-  
-  const changes = Diff.diffLines(props.currentContent, props.compareContent);
-  const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
-  const changesIndices: { startLine: number, endLine: number }[] = [];
-  
-  let lineNumber = 1;
-  let addedCount = 0;
-  let removedCount = 0;
-
-  changes.forEach(part => {
-    const lines = part.count || 0;
-    if (part.added) {
-      addedCount += lines;
-      const start = lineNumber;
-      const end = lineNumber + lines - 1;
-      
-      newDecorations.push({
-        range: new monaco.Range(start, 1, end, 1),
-        options: {
-          isWholeLine: true,
-          className: 'diff-line-added',
-          linesDecorationsClassName: 'diff-gutter-added'
-        }
-      });
-      
-      changesIndices.push({ startLine: start, endLine: end });
-      
-      lineNumber += lines;
-    } else if (part.removed) {
-      removedCount += lines;
-      // We can add a decoration at current line to indicate deletion
-      // Glyph margin decoration
-      newDecorations.push({
-          range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-          options: {
-              glyphMarginClassName: 'diff-glyph-removed',
-              glyphMarginHoverMessage: { value: `Deleted ${lines} lines here (relative to latest)` }
-          }
-      });
-      // But we don't increment lineNumber
-    } else {
-      lineNumber += lines;
-    }
-  });
-
-  decorations = editor.deltaDecorations(decorations, newDecorations);
-  stats.value = { added: addedCount, removed: removedCount };
-  changeList.value = changesIndices;
-  changeIndex.value = -1;
-}
-
 function navChange(dir: number) {
-    if (changeList.value.length === 0) return;
-    
-    let next = changeIndex.value + dir;
-    if (next < 0) next = 0;
-    if (next >= changeList.value.length) next = changeList.value.length - 1;
-    
-    changeIndex.value = next;
-    const change = changeList.value[next];
-    
-    if (editor) {
-        editor.revealLineInCenter(change.startLine);
-        editor.setSelection(new monaco.Range(change.startLine, 1, change.endLine, 1000));
-    }
+  if (!editor) return;
+  if (changeList.value.length === 0) return;
+
+  const next = (() => {
+    if (changeIndex.value < 0) return 0;
+    const idx = changeIndex.value + dir;
+    if (idx < 0) return changeList.value.length - 1;
+    if (idx >= changeList.value.length) return 0;
+    return idx;
+  })();
+
+  changeIndex.value = next;
+  const c = changeList.value[next];
+  const range = new monaco.Range(c.startLine, 1, c.endLine, 1);
+  editor.revealRangeInCenter(range);
+  editor.setSelection(range);
 }
 </script>
 
@@ -296,6 +288,10 @@ function navChange(dir: number) {
 .editor-host {
   flex: 1;
   overflow: hidden;
+}
+
+.diff-line {
+  background: rgba(24, 160, 88, 0.08);
 }
 
 .path-list {

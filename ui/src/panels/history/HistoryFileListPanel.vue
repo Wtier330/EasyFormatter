@@ -66,7 +66,7 @@ import { SearchOutline, DocumentTextOutline, TimeOutline, RefreshOutline, Filter
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
 
-const props = defineProps<{
+defineProps<{
   collapsed?: boolean;
 }>();
 

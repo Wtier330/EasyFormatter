@@ -2,7 +2,7 @@
 
 ## 项目概述
 EasyFormatter 是一个基于 Tauri v2 (Rust) + Vue 3 (TypeScript) 的跨平台桌面应用。
-当前版本: **1.1.0**
+当前版本: **1.2.0**
 
 ## 技术栈
 - **核心框架**: Tauri v2
@@ -58,9 +58,18 @@ npm run tauri build
 ```
 
 ## 测试
-当前项目主要依赖手动验证，尚未集成自动化单元测试。
-- **Rust 后端**: 可通过 `cargo test` 运行 (目前无测试用例)
-- **前端**: 尚未配置 Vitest/Jest
+当前项目已引入部分自动化测试，但覆盖仍然有限，功能改动后仍建议配合手动验证。
+
+### Rust 后端 (src-tauri)
+- 运行：`cargo test`（仓库已包含测试用例，主要在 `src-tauri/tests` 以及部分模块内测试）
+
+### 前端 (ui)
+- 本项目已安装 **Vitest**，并存在 `*.test.ts` 用例（例如 `ui/src/utils/*`、`ui/src/stores/*`）。
+- 运行（在 `ui/` 目录）：`npx vitest run`
+
+### 构建/类型检查（推荐每次提交前执行）
+- 前端构建 + 类型检查（在根目录）：`npm run build --prefix ui`（等价于 `vue-tsc && vite build`）
+- 后端编译/测试（在 `src-tauri/`）：`cargo test`
 
 ## 贡献规范
 - **注释**: 所有代码注释应使用中文。

@@ -18,8 +18,8 @@ fn write_integrity_and_hash_dedup() {
     let c1 = r#"{"a":1}"#.to_string();
     let c2 = r#"{"a":2}"#.to_string();
     let c3 = r#"{"a":3}"#.to_string();
-    let id1 = commands::history_record_stub(path.clone(), c1.clone(), None, Some("save".into())).unwrap();
-    let id2 = commands::history_record_stub(path.clone(), c2.clone(), None, Some("format".into())).unwrap();
+    let _id1 = commands::history_record_stub(path.clone(), c1.clone(), None, Some("save".into())).unwrap();
+    let _id2 = commands::history_record_stub(path.clone(), c2.clone(), None, Some("format".into())).unwrap();
     let id3 = commands::history_record_stub(path.clone(), c3.clone(), None, Some("transform".into())).unwrap();
     let id3_dup = commands::history_record_stub(path.clone(), c3.clone(), None, Some("transform".into())).unwrap();
     assert_eq!(id3, id3_dup);
@@ -85,7 +85,7 @@ fn broken_chain_errors_on_materialize() {
     let path = rand_path();
     let a = r#"{"a":1}"#.to_string();
     let b = r#"{"a":2}"#.to_string();
-    let id1 = commands::history_record_stub(path.clone(), a.clone(), None, Some("save".into())).unwrap();
+    let _id1 = commands::history_record_stub(path.clone(), a.clone(), None, Some("save".into())).unwrap();
     let id2 = commands::history_record_stub(path.clone(), b.clone(), None, Some("format".into())).unwrap();
     let repo = SqliteHistoryRepo::new().unwrap();
     let v2 = repo.get_version(id2).unwrap();

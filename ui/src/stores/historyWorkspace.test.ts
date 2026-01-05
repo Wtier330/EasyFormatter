@@ -17,6 +17,7 @@ vi.mock('../services/historyService', () => {
       }),
       recordCheckpointStub: vi.fn(async () => 1),
       copyRestore: vi.fn(async () => 'C:/exports/restored.json'),
+      deleteVersions: vi.fn(async () => ({ removed_count: 1, removed_bytes: 10 })),
       getStats: vi.fn(async () => ({ db_size: 0, records_count: 0, file_count: 1, top_files: [] })),
       gc: vi.fn(async () => ({ removed_count: 0, removed_bytes: 0 }))
     }
@@ -53,5 +54,14 @@ describe('historyWorkspace store', () => {
     await p2;
     expect(store.selectedRecord?.id).toBe(11);
     expect(store.compareContent).toBe('{"a":2}');
+  });
+
+  it('deleteVersions calls service and refreshes store', async () => {
+    const store = useHistoryWorkspaceStore();
+    await store.enterHistoryMode();
+    const file = { id: 1, logical_path: 'C:/a.json', created_at: 0, updated_at: 0 };
+    await store.selectFile(file as any);
+    await store.deleteVersions([10]);
+    expect(store.selectedRecord).toBe(null);
   });
 });

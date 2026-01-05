@@ -42,14 +42,19 @@
               <n-icon size="12"><ChevronDown /></n-icon>
           </div>
        </n-popselect>
+       
+       <n-divider vertical />
+       <n-button quaternary circle size="small" @click="$emit('close')" title="关闭历史预览">
+         <template #icon><n-icon><CloseOutline /></n-icon></template>
+       </n-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { NTag, NIcon, NPopselect, NSpin } from 'naive-ui';
-import { ChevronDown } from '@vicons/ionicons5';
+import { NTag, NIcon, NPopselect, NSpin, NButton, NDivider } from 'naive-ui';
+import { ChevronDown, CloseOutline } from '@vicons/ionicons5';
 import type { VersionSummary } from '../../services/historyService';
 
 const props = defineProps<{
@@ -62,6 +67,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:baseMode', mode: 'latest' | 'previous'): void;
+  (e: 'close'): void;
 }>();
 
 const baseMode = ref(props.currentBaseMode);

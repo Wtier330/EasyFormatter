@@ -30,6 +30,7 @@ pub fn run() {
             history::commands::history_get_version_content,
             history::commands::history_materialize,
             history::commands::history_stats,
+            history::commands::history_delete_versions,
             history::commands::history_gc,
             history::commands::history_debug_db_info
         ]);

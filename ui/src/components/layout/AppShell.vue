@@ -12,51 +12,58 @@
 
         <!-- 3. Main Content -->
         <div class="content-wrapper" ref="contentWrapper">
-            <!-- History Mode -->
-            <template v-if="isHistoryMode">
+            <!-- Files Mode (Always Present) -->
+            <transition name="tabs-slide">
+              <TabsBar v-if="hasTabs && !isHistoryMode" />
+            </transition>
+            <FunctionBar />
+            
+            <!-- Mode 1: Normal Editor Mode -->
+            <div class="work-area" v-if="hasTabs && !isHistoryMode">
+                <!-- Editor -->
+                <div class="editor-area ui-panel" :class="{ 'panel-active': isResizingPreview }">
+                    <JsonEditor ref="jsonEditorRef" />
+                </div>
+                
+                <!-- Splitter -->
+                <Splitter
+                  :always-visible="true"
+                  @resize="onResizePreview"
+                  @dragStart="isResizingPreview = true"
+                  @dragEnd="isResizingPreview = false"
+                />
+
+                <!-- Preview -->
+                <div
+                  class="preview-area ui-panel"
+                  :style="{ width: appStore.previewRatio * 100 + '%' }"
+                  :class="{ 'panel-active': isResizingPreview }"
+                >
+                    <PreviewPanel ref="previewRef" />
+                </div>
+            </div>
+
+            <!-- Mode 2: History Browse Mode (Single Viewer) -->
+            <div class="work-area history-browse" v-else-if="isHistoryMode">
+                 <HistorySingleViewer 
+                    :content="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareContent : historyWorkspaceStore.currentContent" 
+                    :record="historyWorkspaceStore.selectedRecord ?? (historyWorkspaceStore.records[0] ?? null)"
+                    :language="computedHistoryLanguage"
+                    :hash="historyWorkspaceStore.selectedRecord ? historyWorkspaceStore.compareHash : historyWorkspaceStore.currentHash"
+                 />
+            </div>
+
+            <!-- Empty State -->
+            <EmptyState v-else :onNewFile="handleNew" />
+
+            <!-- History Detail Overlay (Inspect Phase) -->
+            <div v-if="historyWorkspaceStore.inspectMode" class="history-overlay">
                 <HistoryWorkbench 
-                    v-if="historyWorkspaceStore.compareMode"
                     :currentContent="historyWorkspaceStore.currentContent"
                     :compareContent="historyWorkspaceStore.compareContent"
                     :compareMode="historyWorkspaceStore.compareMode"
                 />
-                <div v-else class="empty-guide">
-                    <n-empty description="请选择左侧文件查看历史" style="margin-top: 100px" />
-                </div>
-            </template>
-
-            <!-- Files Mode (Default) -->
-            <template v-else>
-                <transition name="tabs-slide">
-                  <TabsBar v-if="hasTabs" />
-                </transition>
-                <FunctionBar />
-                
-                <div class="work-area" v-if="hasTabs">
-                    <!-- Editor -->
-                    <div class="editor-area ui-panel" :class="{ 'panel-active': isResizingPreview }">
-                        <JsonEditor ref="jsonEditorRef" />
-                    </div>
-                    
-                    <!-- Splitter -->
-                    <Splitter
-                      :always-visible="true"
-                      @resize="onResizePreview"
-                      @dragStart="isResizingPreview = true"
-                      @dragEnd="isResizingPreview = false"
-                    />
-
-                    <!-- Preview -->
-                    <div
-                      class="preview-area ui-panel"
-                      :style="{ width: appStore.previewRatio * 100 + '%' }"
-                      :class="{ 'panel-active': isResizingPreview }"
-                    >
-                        <PreviewPanel ref="previewRef" />
-                    </div>
-                </div>
-                <EmptyState v-else :onNewFile="handleNew" />
-            </template>
+            </div>
         </div>
 
         <!-- 4. Right Drawer -->
@@ -65,12 +72,6 @@
             class="right-drawer"
             :style="{ width: drawerWidthPx }"
         >
-             <div class="drawer-header">
-                <div class="drawer-title"></div>
-                <div class="drawer-close" @click="layoutStore.closeRightDrawer">
-                   <n-icon size="16"><CloseOutline /></n-icon>
-                </div>
-             </div>
              <div class="drawer-content">
                  <component :is="currentDrawerComponent" />
              </div>
@@ -92,8 +93,8 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
-import { useMessage, NIcon, NEmpty } from 'naive-ui';
-import { CloseOutline, CloudUploadOutline } from '@vicons/ionicons5';
+import { useMessage, NIcon } from 'naive-ui';
+import { CloudUploadOutline } from '@vicons/ionicons5';
 
 // Core Layout Components
 import Toolbar from './Toolbar.vue';
@@ -109,6 +110,7 @@ import EmptyState from './EmptyState.vue';
 import JsonEditor from '../editor/JsonEditor.vue';
 import PreviewPanel from '../preview/PreviewPanel.vue';
 import HistoryWorkbench from '../history/HistoryWorkbench.vue';
+import HistorySingleViewer from '../history/HistorySingleViewer.vue';
 
 // Stores
 import { useAppStore } from '../../stores/app';
@@ -189,6 +191,17 @@ const currentDrawerComponent = computed(() => {
     } catch {
       return null;
     }
+});
+
+const computedHistoryLanguage = computed(() => {
+    const path = historyWorkspaceStore.activeFile?.logical_path || '';
+    if (path.endsWith('.json')) return 'json';
+    if (path.endsWith('.xml')) return 'xml';
+    if (path.endsWith('.js')) return 'javascript';
+    if (path.endsWith('.ts')) return 'typescript';
+    if (path.endsWith('.css')) return 'css';
+    if (path.endsWith('.html')) return 'html';
+    return 'json';
 });
 
 
@@ -410,23 +423,6 @@ onUnmounted(() => {
     flex-direction: column;
 }
 
-.drawer-header {
-    height: 32px; /* Or hidden */
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 0 8px;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.drawer-close {
-    cursor: pointer;
-    color: #999;
-}
-.drawer-close:hover {
-    color: #333;
-}
-
 .drawer-content {
     flex: 1;
     overflow: hidden;
@@ -488,5 +484,17 @@ onUnmounted(() => {
 .tabs-slide-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+.history-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
 }
 </style>
