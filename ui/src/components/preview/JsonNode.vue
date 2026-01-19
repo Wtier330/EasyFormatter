@@ -1,10 +1,12 @@
 <template>
-  <div class="json-node">
+  <div class="json-node" :data-path="path">
     <div 
       class="node-line" 
       :class="{ 'hover-active': isHovered }"
       @mouseenter="isHovered = true"
       @mouseleave="isHovered = false"
+      :data-path="path"
+      :data-start="path"
     >
       <!-- Indentation -->
       <span class="indent" :style="{ width: depth * 20 + 'px' }"></span>
@@ -129,7 +131,7 @@
         </div>
 
         <!-- Closing Bracket -->
-        <div class="node-line">
+        <div class="node-line" :data-end="path">
           <span class="indent" :style="{ width: depth * 20 + 'px' }"></span>
           <span class="toggle-placeholder"></span>
           <span class="bracket">{{ isArray ? ']' : '}' }}</span>
