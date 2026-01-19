@@ -35,7 +35,8 @@ pub fn run() {
             history::commands::history_delete_file_history,
             history::commands::history_delete_versions,
             history::commands::history_gc,
-            history::commands::history_debug_db_info
+            history::commands::history_debug_db_info,
+            history::commands::history_convert_legacy_checkpoints
         ]);
     
     // 启动时主动初始化应用数据目录结构

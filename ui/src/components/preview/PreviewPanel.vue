@@ -29,13 +29,6 @@
           <span>变换结果：{{ configStore.transformMode }}</span>
         </div>
         <div class="result-actions">
-           <button class="result-btn" @click="configStore.undoTransform" :disabled="!configStore.canUndo" title="撤销 (Ctrl+Z)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-           </button>
-           <button class="result-btn" @click="configStore.redoTransform" :disabled="!configStore.canRedo" title="重做 (Ctrl+Y)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1)"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-           </button>
-           <div class="divider"></div>
            <button class="result-btn" @click="copyResult" title="复制结果">复制</button>
            <button class="result-btn close" @click="clearResult" title="关闭">×</button>
         </div>

@@ -1,5 +1,5 @@
 use tauri::command;
-use super::repo::{SqliteHistoryRepo, HistoryRepo, HistoryStats};
+use super::repo::{SqliteHistoryRepo, HistoryRepo, HistoryStats, LegacyCheckpointPayload};
 use super::models::{FileRecord, VersionRecord, VersionSummary};
 use crate::appdirs::{is_deployment_mode, get_app_dirs};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,22 +17,51 @@ fn decompress(data: &[u8]) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|e| e.to_string())
 }
 
-// Helper: Canonicalize
-fn canonicalize(text: &str) -> (String, String, bool) {
-    // Try to parse as JSON
+const PAYLOAD_FORMAT_PRETTY_JSON_V1: &str = "json_pretty_v1";
+const PAYLOAD_FORMAT_TEXT_PLAIN_V1: &str = "text_plain_v1";
+const DEFAULT_JSON_INDENT: u32 = 2;
+
+struct NormalizedPayload {
+    stored: String,
+    hash: String,
+    is_json: bool,
+}
+
+fn build_op_meta(payload_format: &str, is_json: bool, converted_from: Option<&str>) -> String {
+    let mut meta = serde_json::json!({
+        "payload_format": payload_format,
+        "hash_algo": "sha256",
+        "hash_basis": if is_json { "json_minified" } else { "raw_text" }
+    });
+
+    if is_json {
+        meta["indent"] = serde_json::json!(DEFAULT_JSON_INDENT);
+    }
+    if let Some(from) = converted_from {
+        meta["converted_from"] = serde_json::json!(from);
+    }
+    meta.to_string()
+}
+
+fn normalize_payload(text: &str) -> NormalizedPayload {
     match serde_json::from_str::<Value>(text) {
         Ok(val) => {
-            // Re-serialize to get canonical string. 
-            // Note: If "preserve_order" feature is on, this preserves order.
-            // To strictly sort keys as per requirement, we would need to traverse and sort.
-            // For now, we rely on serde_json's output.
-            let canon = serde_json::to_string(&val).unwrap_or(text.to_string());
-            let hash = hex::encode(sha2::Sha256::digest(canon.as_bytes()));
-            (canon, hash, true)
-        },
+            let canonical_minified = serde_json::to_string(&val).unwrap_or_else(|_| text.to_string());
+            let hash = hex::encode(sha2::Sha256::digest(canonical_minified.as_bytes()));
+            let pretty = serde_json::to_string_pretty(&val).unwrap_or_else(|_| text.to_string());
+            NormalizedPayload {
+                stored: pretty,
+                hash,
+                is_json: true,
+            }
+        }
         Err(_) => {
             let hash = hex::encode(sha2::Sha256::digest(text.as_bytes()));
-            (text.to_string(), hash, false)
+            NormalizedPayload {
+                stored: text.to_string(),
+                hash,
+                is_json: false,
+            }
         }
     }
 }
@@ -77,6 +106,10 @@ fn materialize_version_logic(repo: &SqliteHistoryRepo, version_id: i64) -> Resul
     } else {
         String::from_utf8(base_blob).map_err(|e| e.to_string())?
     };
+
+    if let Ok(doc) = serde_json::from_str::<Value>(&content_str) {
+        content_str = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
+    }
     
     // 3. Apply patches (Checkpoint -> Target)
     // Chain is [Target, ..., Checkpoint]
@@ -93,7 +126,7 @@ fn materialize_version_logic(repo: &SqliteHistoryRepo, version_id: i64) -> Resul
              let mut doc: Value = serde_json::from_str(&content_str).map_err(|e| format!("Base invalid JSON: {}", e))?;
              
              json_patch::patch(&mut doc, &patch).map_err(|e| format!("Patch failed: {}", e))?;
-             content_str = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
+             content_str = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
         }
     }
     
@@ -169,13 +202,13 @@ pub fn history_record_stub(file_path: String, content: String, note: Option<Stri
     let file_id = repo.get_or_create_file(&file_path).map_err(|e| e.to_string())?;
 
     // 1. Canonicalize & Hash
-    let (canon_content, hash, is_json) = canonicalize(&content);
-    let size = canon_content.len() as i64;
+    let normalized = normalize_payload(&content);
+    let size = normalized.stored.as_bytes().len() as i64;
 
     // 2. Check Deduplication
     // If hash matches existing version for this file, we skip?
     // User says: "hash 相同不插入"
-    if let Ok(Some(_existing)) = repo.get_version_by_hash(file_id, &hash) {
+    if let Ok(Some(_existing)) = repo.get_version_by_hash(file_id, &normalized.hash) {
         // Already exists. Return existing ID? 
         // Or return 0 to indicate no-op?
         // Let's return existing ID.
@@ -196,13 +229,13 @@ pub fn history_record_stub(file_path: String, content: String, note: Option<Stri
     if let Some(p) = parent {
         parent_id = Some(p.id);
         
-        if is_json {
+        if normalized.is_json {
             // Try to create patch
             // We need parent content
             if let Ok((parent_content, _)) = materialize_version_logic(&repo, p.id) {
                 if let (Ok(parent_json), Ok(current_json)) = (
                     serde_json::from_str::<Value>(&parent_content),
-                    serde_json::from_str::<Value>(&canon_content)
+                    serde_json::from_str::<Value>(&normalized.stored)
                 ) {
                     let patch = json_patch::diff(&parent_json, &current_json);
                     let inverse_patch = json_patch::diff(&current_json, &parent_json);
@@ -234,7 +267,7 @@ pub fn history_record_stub(file_path: String, content: String, note: Option<Stri
     }
 
     if is_checkpoint {
-        patch_blob = Some(compress(canon_content.as_bytes())?);
+        patch_blob = Some(normalized.stored.as_bytes().to_vec());
         // inverse is None
     }
     
@@ -247,18 +280,26 @@ pub fn history_record_stub(file_path: String, content: String, note: Option<Stri
         }
     }
 
+    let op_meta = Some(if normalized.is_json {
+        build_op_meta(PAYLOAD_FORMAT_PRETTY_JSON_V1, true, None)
+    } else {
+        build_op_meta(PAYLOAD_FORMAT_TEXT_PLAIN_V1, false, None)
+    });
+
+    let codec = if is_checkpoint { "none".to_string() } else { "zstd".to_string() };
+
     let ver = VersionRecord {
         id: 0, // auto
         file_id,
         parent_id,
         ts: now,
         op_type: final_op_type,
-        op_meta: None,
+        op_meta,
         base_hash,
-        this_hash: hash,
+        this_hash: normalized.hash,
         patch_blob,
         inverse_patch_blob,
-        codec: "zstd".to_string(),
+        codec,
         payload_size: size,
         validate_ok: true,
         note,
@@ -266,6 +307,76 @@ pub fn history_record_stub(file_path: String, content: String, note: Option<Stri
     };
 
     repo.add_version(&ver).map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct ConvertLegacyResult {
+    scanned: i64,
+    converted: i64,
+    skipped: i64,
+}
+
+#[command]
+pub fn history_convert_legacy_checkpoints(file_id: Option<i64>, limit: Option<u32>) -> Result<ConvertLegacyResult, String> {
+    if !is_deployment_mode() {
+        return Err("History disabled".into());
+    }
+
+    let limit = limit.unwrap_or(500).clamp(1, 5000) as usize;
+    let repo = SqliteHistoryRepo::new().map_err(|e| e.to_string())?;
+    let candidates: Vec<LegacyCheckpointPayload> = repo
+        .list_legacy_checkpoint_payloads(file_id, limit)
+        .map_err(|e| e.to_string())?;
+
+    let mut scanned: i64 = 0;
+    let mut converted: i64 = 0;
+    let mut skipped: i64 = 0;
+
+    for c in candidates {
+        scanned += 1;
+        if c.codec != "zstd" {
+            skipped += 1;
+            continue;
+        }
+
+        let text = match decompress(&c.patch_blob) {
+            Ok(v) => v,
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
+        };
+
+        let normalized = normalize_payload(&text);
+        if normalized.hash != c.this_hash {
+            skipped += 1;
+            continue;
+        }
+
+        let op_meta = Some(if normalized.is_json {
+            build_op_meta(PAYLOAD_FORMAT_PRETTY_JSON_V1, true, Some("zstd_checkpoint_v0"))
+        } else {
+            build_op_meta(PAYLOAD_FORMAT_TEXT_PLAIN_V1, false, Some("zstd_checkpoint_v0"))
+        });
+
+        let payload_size = normalized.stored.as_bytes().len() as i64;
+        repo.update_version_payload(
+            c.id,
+            normalized.stored.as_bytes().to_vec(),
+            "none",
+            payload_size,
+            op_meta,
+        )
+        .map_err(|e| e.to_string())?;
+
+        converted += 1;
+    }
+
+    Ok(ConvertLegacyResult {
+        scanned,
+        converted,
+        skipped,
+    })
 }
 
 #[command]

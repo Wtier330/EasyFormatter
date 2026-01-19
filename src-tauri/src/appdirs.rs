@@ -13,14 +13,23 @@ pub struct AppDirs {
 
 impl AppDirs {
     pub fn new() -> Option<Self> {
-        // 使用 directories crate 获取标准路径
-        // Windows: %APPDATA%/EasyFormatter
-        // macOS: ~/Library/Application Support/EasyFormatter
-        // Linux: ~/.config/easyformatter
-        // 注意：这里使用空的前缀和组织名，以避免多层目录 (如 com.easyformatter...)
-        let proj_dirs = ProjectDirs::from("", "", "EasyFormatter")?;
-        
-        let root = proj_dirs.data_dir().to_path_buf();
+        let root = if let Ok(p) = std::env::var("EASYFORMATTER_DATA_DIR") {
+            PathBuf::from(p)
+        } else {
+            let proj_dirs = ProjectDirs::from("", "", "EasyFormatter")?;
+            proj_dirs.data_dir().to_path_buf()
+        };
+
+        let root = if std::env::var("EASYFORMATTER_TEST_DB_PER_THREAD").unwrap_or_default() == "1" {
+            let tid = format!("{:?}", std::thread::current().id());
+            let safe = tid
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect::<String>();
+            root.join("tests").join(safe)
+        } else {
+            root
+        };
         
         Some(Self {
             db: root.join("db"),

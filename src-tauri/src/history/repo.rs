@@ -33,6 +33,15 @@ pub struct SqliteHistoryRepo {
     conn: Connection,
 }
 
+#[derive(Debug, Clone)]
+pub struct LegacyCheckpointPayload {
+    pub id: i64,
+    pub patch_blob: Vec<u8>,
+    pub codec: String,
+    pub op_meta: Option<String>,
+    pub this_hash: String,
+}
+
 pub struct NoiseDbScan {
     pub file_count: i64,
     pub version_count: i64,
@@ -44,6 +53,68 @@ impl SqliteHistoryRepo {
     pub fn new() -> Result<Self> {
         let conn = init_db()?;
         Ok(Self { conn })
+    }
+
+    pub fn list_legacy_checkpoint_payloads(&self, file_id: Option<i64>, limit: usize) -> Result<Vec<LegacyCheckpointPayload>> {
+        let limit = limit.clamp(1, 5000) as i64;
+        let mut sql = String::from(
+            "SELECT id, patch_blob, codec, op_meta, this_hash
+             FROM versions
+             WHERE is_checkpoint = 1
+               AND codec = 'zstd'
+               AND patch_blob IS NOT NULL
+               AND (op_meta IS NULL OR op_meta NOT LIKE '%\"payload_format\"%')",
+        );
+
+        let mut params_vec: Vec<rusqlite::types::Value> = Vec::new();
+        if let Some(fid) = file_id {
+            sql.push_str(" AND file_id = ?1");
+            params_vec.push(rusqlite::types::Value::Integer(fid));
+            sql.push_str(" ORDER BY ts DESC LIMIT ?2");
+            params_vec.push(rusqlite::types::Value::Integer(limit));
+        } else {
+            sql.push_str(" ORDER BY ts DESC LIMIT ?1");
+            params_vec.push(rusqlite::types::Value::Integer(limit));
+        }
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_vec.into_iter()), |row| {
+            let blob_opt: Option<Vec<u8>> = row.get(1)?;
+            Ok(LegacyCheckpointPayload {
+                id: row.get(0)?,
+                patch_blob: blob_opt.unwrap_or_default(),
+                codec: row.get(2)?,
+                op_meta: row.get(3)?,
+                this_hash: row.get(4)?,
+            })
+        })?;
+
+        let mut out = Vec::new();
+        for r in rows {
+            let v = r?;
+            if v.patch_blob.is_empty() {
+                continue;
+            }
+            out.push(v);
+        }
+        Ok(out)
+    }
+
+    pub fn update_version_payload(
+        &self,
+        version_id: i64,
+        patch_blob: Vec<u8>,
+        codec: &str,
+        payload_size: i64,
+        op_meta: Option<String>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "UPDATE versions
+             SET patch_blob = ?1, codec = ?2, payload_size = ?3, op_meta = ?4
+             WHERE id = ?5",
+            params![patch_blob, codec, payload_size, op_meta, version_id],
+        )?;
+        Ok(())
     }
 
     fn is_noise_like_pattern() -> (&'static str, [&'static str; 6]) {

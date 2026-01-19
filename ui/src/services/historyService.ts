@@ -63,6 +63,12 @@ export interface HistoryDeleteResult {
   removed_bytes: number;
 }
 
+export interface ConvertLegacyResult {
+  scanned: number;
+  converted: number;
+  skipped: number;
+}
+
 /**
  * 历史回滚服务 (History Rollback Service)
  * 
@@ -169,6 +175,10 @@ export const historyService = {
 
   async deleteFileHistory(fileId: number): Promise<HistoryDeleteResult> {
     return await invokeTauri<HistoryDeleteResult>('history_delete_file_history', { fileId });
+  },
+
+  async convertLegacyCheckpoints(fileId?: number, limit?: number): Promise<ConvertLegacyResult> {
+    return await invokeTauri<ConvertLegacyResult>('history_convert_legacy_checkpoints', { fileId, limit });
   },
 
   /**

@@ -27,19 +27,6 @@
           </template>
         </n-button>
 
-        <n-button-group size="small">
-          <n-button @click="handleUndo" :title="undoTitle" class="icon-btn">
-            <template #icon>
-              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M424 424v-46c0-70-63-128-147-128-42 0-81 15-110 41l-2 2-3-3L83.5 211.5a10 10 0 0 0-14 0l-1 1-60 60a10 10 0 0 0 0 14l104 104a10 10 0 0 0 14 0l1-1 78.5-78.5-3-3c27 25 64 39 104 39 52 0 94-29 108-72a8 8 0 0 1 8-6h1z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M240 250h-88v-88"/></svg></n-icon>
-            </template>
-          </n-button>
-          <n-button @click="handleRedo" :title="redoTitle" class="icon-btn">
-             <template #icon>
-              <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="transform: scaleX(-1);"><path d="M424 424v-46c0-70-63-128-147-128-42 0-81 15-110 41l-2 2-3-3L83.5 211.5a10 10 0 0 0-14 0l-1 1-60 60a10 10 0 0 0 0 14l104 104a10 10 0 0 0 14 0l1-1 78.5-78.5-3-3c27 25 64 39 104 39 52 0 94-29 108-72a8 8 0 0 1 8-6h1z" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M240 250h-88v-88"/></svg></n-icon>
-            </template>
-          </n-button>
-        </n-button-group>
-
         <!-- <n-button strong secondary size="small" @click="createNewScratch" class="action-btn">
           <template #icon>
             <n-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M368 224h-112v-112c0-8.84-7.16-16-16-16s-16 7.16-16 16v112h-112c-8.84 0-16 7.16-16 16s7.16 16 16 16h112v112c0 8.84 7.16 16 16 16s16-7.16 16-16v-112h112c8.84 0 16-7.16 16-16s-7.16-16-16-16z" fill="currentColor"/></svg></n-icon>
@@ -366,9 +353,6 @@ const ctrlOrCmd = isMac ? 'Cmd' : 'Ctrl';
 
 const openFileTitle = computed(() => `打开文件 (${ctrlOrCmd}+O)`);
 const saveFileTitle = computed(() => `保存文件 (${ctrlOrCmd}+S)`);
-const undoTitle = computed(() => `撤销 (${ctrlOrCmd}+Z)`);
-const redoTitle = computed(() => `重做 (${ctrlOrCmd}+Shift+Z)`);
-
 const clipboardTipBase = computed(() => {
   if (!clipboardSupported.value) return '当前环境不支持剪贴板 API，将改用手动粘贴';
   if (!clipboardSecure.value) return '当前环境不是安全上下文，无法读取剪贴板，将改用手动粘贴';
@@ -379,30 +363,6 @@ const clipboardTipBase = computed(() => {
 
 const clipboardTipForNew = computed(() => `新粘：${clipboardTipBase.value}`);
 const clipboardTipForPaste = computed(() => `粘贴 (${ctrlOrCmd}+V)：${clipboardTipBase.value}`);
-
-function handleUndo() {
-  if (appStore.activePanel === 'preview') {
-    if (configStore.transformResult !== null) {
-      if (configStore.canUndo) configStore.undoTransform();
-    } else {
-      if (configStore.canUndoDocument) configStore.undoDocument();
-    }
-  } else {
-    configStore.editorActionRequest = 'undo';
-  }
-}
-
-function handleRedo() {
-  if (appStore.activePanel === 'preview') {
-    if (configStore.transformResult !== null) {
-      if (configStore.canRedo) configStore.redoTransform();
-    } else {
-      if (configStore.canRedoDocument) configStore.redoDocument();
-    }
-  } else {
-    configStore.editorActionRequest = 'redo';
-  }
-}
 
 async function createFromClipboard() {
   const text = await readClipboardTextInteractive('new');

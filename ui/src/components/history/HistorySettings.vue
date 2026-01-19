@@ -38,6 +38,14 @@
           </template>
           确定要根据当前保留策略清理数据吗？<br/>这将删除超过 {{ config.historyRetention.maxDays }} 天或超过 {{ config.historyRetention.maxRecords }} 条的历史记录。<br/>此操作不可撤销。
        </n-popconfirm>
+       <n-popconfirm @positive-click="handleConvertLegacy">
+          <template #trigger>
+             <n-button type="info" :loading="converting">
+                转换旧压缩记录
+             </n-button>
+          </template>
+          将旧版 zstd 压缩快照转换为格式化明文存储，用于改善预览与可读性。<br/>该操作不会改变 JSON 语义内容，可重复执行。
+       </n-popconfirm>
     </div>
     
     <n-divider />
@@ -79,6 +87,7 @@ const store = useHistoryWorkspaceStore();
 const config = useConfigStore();
 const message = useMessage();
 const debugInfo = ref<DebugDbInfo | null>(null);
+const converting = ref(false);
 
 const show = computed({
   get: () => props.modelValue,
@@ -110,6 +119,19 @@ async function handleGC() {
       message.error('清理失败');
    }
 }
+
+async function handleConvertLegacy() {
+   converting.value = true;
+   try {
+      const res = await historyService.convertLegacyCheckpoints(undefined, 2000);
+      message.success(`转换完成：扫描 ${res.scanned} 条，成功 ${res.converted} 条，跳过 ${res.skipped} 条`);
+      store.fetchStats();
+   } catch (e) {
+      message.error('转换失败');
+   } finally {
+      converting.value = false;
+   }
+}
 </script>
 
 <style scoped>
@@ -122,5 +144,10 @@ async function handleGC() {
 .desc {
     font-size: 12px;
     color: #999;
+}
+.actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 </style>

@@ -127,6 +127,15 @@ async function sha256Hex(text: string) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function buildHashBasisText(text: string): string {
+  try {
+    const val = JSON.parse(text);
+    return JSON.stringify(val);
+  } catch {
+    return text;
+  }
+}
+
 const verificationStatus = computed(() => {
   if (!props.hash) return 'none';
   if (isVerifying.value) return 'pending';
@@ -158,7 +167,8 @@ watch(
     }
     isVerifying.value = true;
     try {
-      const hex = await sha256Hex(content);
+      const basis = buildHashBasisText(content);
+      const hex = await sha256Hex(basis);
       calculatedHash.value = hex ?? '';
     } finally {
       isVerifying.value = false;

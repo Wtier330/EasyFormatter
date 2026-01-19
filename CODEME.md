@@ -104,6 +104,32 @@ npm run tauri build
    - 逗号 `,` 应仅在非最后一行元素后显示。
    - 避免在已展开的对象/数组块末尾重复显示逗号。
 
+## 历史记录数据格式 (History Payload Format)
+
+历史记录模块使用 SQLite 的 `versions` 表存储版本链（快照/补丁）。为保证“可读性优先”的预览体验，同时保持去重/一致性校验能力，当前采用以下约定：
+
+1. **快照存储**:
+   - 新写入的快照（`is_checkpoint=1`）使用明文存储：`codec='none'`，`patch_blob` 直接保存格式化后的内容（JSON 为 pretty 输出，默认 2 空格缩进）。
+   - 旧数据可能存在 `codec='zstd'` 的快照：`patch_blob` 为 zstd 压缩后的文本，读取时会自动解压并进行 pretty 输出（向后兼容）。
+
+2. **补丁存储**:
+   - 对于 JSON 且差异较小的版本，会以 `json-patch` 形式写入 `patch_blob`，并使用 `codec='zstd'` 压缩补丁内容；回放时按链路还原。
+
+3. **版本标识 (op_meta)**:
+   - 新写入记录会在 `op_meta` 中保存 JSON 元信息，例如：
+     - `payload_format`: `json_pretty_v1` / `text_plain_v1`
+     - `hash_algo`: `sha256`
+     - `hash_basis`: `json_minified` / `raw_text`
+     - `indent`: `2`（仅 JSON）
+
+4. **一致性校验（Hash Basis）**:
+   - JSON：以“语义等价”的 minified 结果作为 hash basis（Rust/前端均为 parse 后 `to_string/JSON.stringify`）。
+   - 非 JSON：以原始文本作为 hash basis。
+
+5. **旧数据批量转换**:
+   - 在“历史设置与维护”中提供“转换旧压缩记录”操作，会将旧版 `codec='zstd'` 的快照批量转换为 `codec='none'` 的格式化明文存储，并补齐 `op_meta` 标识。
+   - 转换过程会进行 hash 校验，避免写入不一致数据；该操作可重复执行。
+
 ## v1.1.0 更新日志
 - 新增 Scratch 临时文档功能
 - 优化多标签页管理逻辑
