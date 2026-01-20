@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, provide, nextTick } from 'vue';
+import { computed, ref, watch, provide } from 'vue';
 import { NIcon } from 'naive-ui';
 import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
