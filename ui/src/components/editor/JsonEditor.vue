@@ -1,11 +1,24 @@
 <template>
   <div class="editor-wrapper">
     <div class="editor-container" ref="container"></div>
+    <SearchWidget
+      ref="searchWidgetRef"
+      v-model:visible="searchVisible"
+      :show-replace="showReplace"
+      :matches-count="matches.length"
+      :current-match-index="currentMatchIndex"
+      @find="onFind"
+      @next="onNext"
+      @prev="onPrev"
+      @replace="onReplace"
+      @replace-all="onReplaceAll"
+      @close="closeSearch"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, shallowRef } from 'vue';
 import * as monaco from 'monaco-editor';
 import { useNotification } from 'naive-ui';
 import { debounce } from '../../utils/debounce';
@@ -14,14 +27,27 @@ import { useAppStore } from '../../stores/app';
 import { parsePath } from '../../utils/json';
 import { findNodeRange } from '../../utils/locator';
 import { transformText, type TransformMode, TRANSFORM_MODES } from '../../utils/textTransform';
+import SearchWidget from './SearchWidget.vue';
 
 const configStore = useConfigStore();
 const appStore = useAppStore();
 const notification = useNotification();
 
 const container = ref<HTMLElement | null>(null);
+const searchWidgetRef = ref<any>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 const modelMap = new Map<string, monaco.editor.ITextModel>();
+
+// Search State
+const searchVisible = ref(false);
+const showReplace = ref(false);
+const matches = shallowRef<monaco.editor.FindMatch[]>([]);
+const currentMatchIndex = ref(-1);
+let decorationsCollection: monaco.editor.IEditorDecorationsCollection | null = null;
+
+// Search Options
+let currentQuery = '';
+let currentOptions = { regex: false, case: false, word: false };
 
 function getOrCreateModel(id: string, initialText: string): monaco.editor.ITextModel {
   if (modelMap.has(id)) {
@@ -63,10 +89,34 @@ function createEditor() {
     wordBasedSuggestions: 'off',
     contextmenu: true // Enable context menu for actions
   });
+  
+  // Custom Search Actions
+  editor.addAction({
+    id: 'custom-find',
+    label: 'Find',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF],
+    run: () => openSearch(false)
+  });
+
+  editor.addAction({
+    id: 'custom-replace',
+    label: 'Replace',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR],
+    run: () => openSearch(true)
+  });
 
   editor.onDidFocusEditorText(() => {
     appStore.setActivePanel('editor');
   });
+
+  // Listen to cursor changes to update current match index if user clicks around
+  editor.onDidChangeCursorPosition((e) => {
+    if (searchVisible.value && matches.value.length > 0) {
+      updateCurrentMatchIndexFromCursor(e.position);
+    }
+  });
+  
+  decorationsCollection = editor.createDecorationsCollection([]);
 
   const applyChange = debounce(() => {
     // Sync current model content to store
@@ -166,9 +216,11 @@ function createEditor() {
 
 onMounted(() => {
   createEditor();
+  window.addEventListener('keydown', handleGlobalKeydown, true);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown, true);
   editor?.dispose();
   modelMap.forEach(model => model.dispose());
   modelMap.clear();
@@ -336,6 +388,258 @@ watch(() => configStore.editorActionRequest, async (action) => {
   
   configStore.editorActionRequest = null;
 });
+
+// --- Search Logic ---
+
+function openSearch(replace: boolean) {
+  searchVisible.value = true;
+  showReplace.value = replace;
+  // Get current selection to seed search
+  const selection = editor?.getSelection();
+  if (selection && !selection.isEmpty()) {
+    const text = editor?.getModel()?.getValueInRange(selection);
+    if (text && text.length < 100 && !text.includes('\n')) {
+      // Set text in widget
+      searchWidgetRef.value?.setFindText(text);
+      currentQuery = text; // Optimistic update
+      // Trigger find immediately
+      onFind(text, currentOptions);
+    }
+  }
+}
+
+function closeSearch() {
+  try {
+    searchWidgetRef.value?.persistLastSearch?.();
+  } catch {
+  }
+  searchVisible.value = false;
+  matches.value = [];
+  currentMatchIndex.value = -1;
+  decorationsCollection?.clear();
+  editor?.focus();
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (!searchVisible.value) return;
+  if (e.key !== 'Escape') return;
+  e.preventDefault();
+  e.stopPropagation();
+  closeSearch();
+}
+
+function onFind(query: string, options: { regex: boolean, case: boolean, word: boolean }) {
+  currentQuery = query;
+  currentOptions = options;
+  updateMatches();
+}
+
+function updateMatches() {
+  if (!editor || !currentQuery) {
+    matches.value = [];
+    currentMatchIndex.value = -1;
+    decorationsCollection?.clear();
+    return;
+  }
+
+  const model = editor.getModel();
+  if (!model) return;
+
+  // Monaco findMatches
+  // searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches
+  // wordSeparators: default is null (uses standard)
+  // searchOnlyEditableRange: false
+  
+  // Handling Word Match: Monaco findMatches doesn't have "whole word" boolean directly in this signature?
+  // Wait, ITextModel.findMatches signature:
+  // (searchString: string, searchOnlyEditableRange: boolean, isRegex: boolean, matchCase: boolean, wordSeparators: string | null, captureMatches: boolean, limitResultCount?: number): FindMatch[]
+  // It seems "Whole Word" is usually implemented by regex \b...\b or passing wordSeparators.
+  // Actually, standard Monaco FindController uses a more complex logic.
+  // But wait, there is another overload or method?
+  // Let's use `model.findMatches(query, ...)`
+  
+  // If word match is ON, and not regex, we can wrap in \b (if query is simple).
+  // Or stick to Monaco's behavior.
+  // If `wordSeparators` is provided, it might help. 
+  // Actually, if matchWholeWord is true, we can simulate it if not regex.
+  
+  let searchString = currentQuery;
+  let isRegex = currentOptions.regex;
+  
+  if (currentOptions.word && !isRegex) {
+    // Escape regex chars in query
+    const escaped = searchString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    searchString = `\\b${escaped}\\b`;
+    isRegex = true;
+  }
+
+  try {
+    const result = model.findMatches(
+      searchString,
+      false, // searchOnlyEditableRange
+      isRegex,
+      currentOptions.case,
+      null, // wordSeparators
+      false // captureMatches
+    );
+    matches.value = result;
+    
+    // Update decorations
+    updateDecorations();
+    
+    // Update current index based on cursor
+    if (editor.getPosition()) {
+       updateCurrentMatchIndexFromCursor(editor.getPosition()!);
+    }
+  } catch (e) {
+    // Regex error probably
+    matches.value = [];
+    decorationsCollection?.clear();
+  }
+}
+
+function updateDecorations() {
+  if (!decorationsCollection) return;
+  
+  const newDecorations: monaco.editor.IModelDeltaDecoration[] = matches.value.map((m, i) => {
+    const isCurrent = i === currentMatchIndex.value;
+    return {
+      range: m.range,
+      options: {
+        isWholeLine: false,
+        className: isCurrent ? 'find-match-highlight-current' : 'find-match-highlight',
+        overviewRuler: {
+          color: isCurrent ? '#ea5c00' : 'rgba(234, 92, 0, 0.5)',
+          position: monaco.editor.OverviewRulerLane.Center
+        },
+        minimap: {
+          color: isCurrent ? '#ea5c00' : 'rgba(234, 92, 0, 0.5)',
+          position: monaco.editor.MinimapPosition.Inline
+        }
+      }
+    };
+  });
+  
+  decorationsCollection.set(newDecorations);
+}
+
+function updateCurrentMatchIndexFromCursor(position: monaco.Position) {
+  // Find the match that contains or is after the cursor
+  // Simple logic: find first match where range.start >= cursor
+  // Or if cursor is inside a match, that's the current one.
+  
+  if (matches.value.length === 0) {
+    currentMatchIndex.value = -1;
+    return;
+  }
+
+  // Sort matches just in case (Monaco usually returns sorted)
+  // matches.value.sort(...) 
+
+  // Check if cursor is inside any match
+  const insideIndex = matches.value.findIndex(m => m.range.containsPosition(position));
+  if (insideIndex !== -1) {
+    currentMatchIndex.value = insideIndex;
+    updateDecorations(); // update current highlight
+    return;
+  }
+  
+  // Otherwise find the next one
+  // If we are before all matches, index 0?
+  // If we are after all, index -1? or 0 (wrap)?
+  // Usually "current match" implies the one we just found or are about to find.
+  // Let's leave it as is until explicit navigation.
+}
+
+function onNext() {
+  if (matches.value.length === 0) return;
+  
+  let nextIndex = currentMatchIndex.value + 1;
+  if (nextIndex >= matches.value.length) {
+    nextIndex = 0; // Wrap
+  }
+  
+  jumpToMatch(nextIndex);
+}
+
+function onPrev() {
+  if (matches.value.length === 0) return;
+  
+  let prevIndex = currentMatchIndex.value - 1;
+  if (prevIndex < 0) {
+    prevIndex = matches.value.length - 1; // Wrap
+  }
+  
+  jumpToMatch(prevIndex);
+}
+
+function jumpToMatch(index: number) {
+  currentMatchIndex.value = index;
+  const match = matches.value[index];
+  
+  if (editor && match) {
+    editor.setSelection(match.range);
+    editor.revealRangeInCenter(match.range);
+    updateDecorations();
+  }
+}
+
+function onReplace(text: string) {
+  if (!editor || currentMatchIndex.value === -1 || matches.value.length === 0) {
+     onNext(); // Try to find one first
+     return;
+  }
+  
+  const match = matches.value[currentMatchIndex.value];
+  // Ensure the selection matches the match (safety)
+  // editor.setSelection(match.range);
+  
+  editor.executeEdits('replace', [{
+    range: match.range,
+    text: text,
+    forceMoveMarkers: true
+  }]);
+  
+  // After replace, the match is gone/changed. Re-run search.
+  // Ideally incremental, but simple re-run is safer.
+  updateMatches();
+  
+  // Move to next (which might be the same index now occupied by next match)
+  // If we replaced match at index N, the next match is now at index N (shifted up)
+  // So we just call onNext? Or stay at index?
+  // Standard behavior: replace and find next.
+  // Since we re-ran search, matches changed.
+  // The cursor is at the end of replacement.
+  // We should find the next match after cursor.
+  
+  // Force finding next
+  // onNext(); 
+  // Actually updateMatches calls updateCurrentMatchIndexFromCursor.
+  // If cursor is after replacement, it should find the next one.
+  // Let's explicitly jump to the next one if available.
+  
+  if (matches.value.length > 0) {
+     let nextIdx = currentMatchIndex.value; // Stay at index (which is now the next item)
+     if (nextIdx >= matches.value.length) nextIdx = 0;
+     jumpToMatch(nextIdx);
+  }
+}
+
+function onReplaceAll(text: string) {
+  if (!editor || matches.value.length === 0) return;
+  
+  // Construct all edits
+  const edits = matches.value.map(m => ({
+    range: m.range,
+    text: text,
+    forceMoveMarkers: true
+  }));
+  
+  editor.executeEdits('replace-all', edits);
+  
+  updateMatches();
+}
+
 </script>
 
 <style scoped>
@@ -351,5 +655,15 @@ watch(() => configStore.editorActionRequest, async (action) => {
   flex: 1;
   overflow: hidden; /* Critical for Monaco to size correctly */
   min-height: 0; /* Flexbox nested scrolling fix */
+}
+
+/* Decoration Styles (Global because Monaco renders outside scoped) */
+:global(.find-match-highlight) {
+  background-color: rgba(255, 200, 0, 0.3);
+}
+:global(.find-match-highlight-current) {
+  background-color: rgba(255, 150, 0, 0.6);
+  border: 1px solid #ff9900;
+  box-sizing: border-box;
 }
 </style>
