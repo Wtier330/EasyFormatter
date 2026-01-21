@@ -1,7 +1,7 @@
 <template>
   <div class="function-bar" v-if="!isHistoryMode">
     <div class="bar-left">
-      <n-space :size="8" wrap>
+      <n-space :size="8" class="bar-left-space">
         <n-button 
           type="default" 
           size="small" 
@@ -45,21 +45,21 @@
           <template #icon>
             <n-icon><svg t="1766947938849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17675" width="256" height="256"><path d="M494.933333 128m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 426.666666q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-426.666666q0-42.666667 42.666667-42.666667Z" fill="#666666" p-id="17676"></path><path d="M836.266667 341.333333h-85.333334v85.333334h85.333334v341.333333h-597.333334v-341.333333h85.333334V341.333333h-85.333334a85.333333 85.333333 0 0 0-85.333333 85.333334v341.333333a85.333333 85.333333 0 0 0 85.333333 85.333333h597.333334a85.333333 85.333333 0 0 0 85.333333-85.333333v-341.333333a85.333333 85.333333 0 0 0-85.333333-85.333334z" fill="#666666" p-id="17677"></path><path d="M561.493333 701.44l131.413334-131.413333a34.133333 34.133333 0 0 0-24.32-58.026667H406.613333A34.133333 34.133333 0 0 0 384 570.026667l128 131.413333a33.706667 33.706667 0 0 0 49.493333 0z" fill="#666666" p-id="17678"></path></svg></n-icon>
           </template>
-          新粘
+          <span class="btn-text">新粘</span>
         </n-button>
         
         <n-button strong secondary size="small" @click="configStore.format" class="action-btn" aria-label="格式化">
           <template #icon>
             <n-icon><svg t="1766947910743" class="icon" viewBox="0 0 1344 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="16651" width="256" height="256"><path d="M1331.968 482.112L1036.16 183.488a41.6 41.6 0 0 0-60.032 0 42.56 42.56 0 0 0 0 60.544L1242.432 512l-266.24 268.8a42.56 42.56 0 0 0 0 60.608 40.704 40.704 0 0 0 59.136 0l295.744-298.688a43.328 43.328 0 0 0 0.896-60.608zM369.536 183.488a41.6 41.6 0 0 0-59.968 0L13.824 482.112a42.56 42.56 0 0 0 0 60.608l295.68 298.688c8.512 7.68 19.456 11.904 30.464 11.904a39.424 39.424 0 0 0 29.568-12.8 42.56 42.56 0 0 0 0-60.544L103.36 512l266.24-268.8a43.072 43.072 0 0 0 0-59.712z m441.088-181.76a41.408 41.408 0 0 0-51.456 29.568L505.6 970.24c-5.952 23.04 6.72 46.08 29.568 52.032a49.024 49.024 0 0 0 10.944 1.728c18.56 0 35.52-12.8 40.576-31.552L840.128 53.76a42.24 42.24 0 0 0-29.248-51.968l-0.256-0.064z" fill="#87888E" p-id="16652"></path></svg></n-icon>
           </template>
-          格式化
+          <span class="btn-text">格式化</span>
         </n-button>
         
         <n-button strong secondary size="small" @click="configStore.minify" class="action-btn">
           <template #icon>
             <n-icon><svg t="1766948000461" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="19016" width="256" height="256"><path d="M768 938.666667a25.088 25.088 0 0 1-18.090667-7.509334L512 694.442667 274.602667 931.84A25.6 25.6 0 0 1 238.933333 895.658667l256-256a25.429333 25.429333 0 0 1 36.181334 0l256 256a25.429333 25.429333 0 0 1 0 36.181333A24.746667 24.746667 0 0 1 768 938.666667zM512 391.338667a25.6 25.6 0 0 1-18.090667-7.509334l-256-256a25.6 25.6 0 0 1 36.693334-35.669333L512 329.557333 749.397333 92.16A25.6 25.6 0 0 1 785.066667 128.341333l-256 256a25.6 25.6 0 0 1-17.066667 6.997334zM959.146667 537.6H64.853333a25.6 25.6 0 1 1 0-51.2h894.293334a25.6 25.6 0 0 1 0 51.2z" fill="#8a8a8a" p-id="19017"></path><path d="M911.872 615.936m-34.133333 0l-731.306667 0q-34.133333 0-34.133333-34.133333l0-82.602667q0-34.133333 34.133333-34.133333l731.306667 0q34.133333 0 34.133333 34.133333l0 82.602667q0 34.133333-34.133333 34.133333Z" fill="#8a8a8a" opacity=".3" p-id="19018"></path></svg></n-icon>
           </template>
-          压缩
+          <span class="btn-text">压缩</span>
         </n-button>
 
         <n-dropdown 
@@ -68,14 +68,23 @@
           @select="handleTransformSelect"
         >
           <n-button strong secondary size="small" class="action-btn" title="文本变换">
-            变换 ▾
+            <template #icon>
+              <n-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                  <path d="M400 256H112" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/>
+                  <path d="M336 192l64 64-64 64" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/>
+                  <path d="M176 128l-64 64 64 64" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/>
+                </svg>
+              </n-icon>
+            </template>
+            <span class="btn-text">变换 ▾</span>
           </n-button>
         </n-dropdown>
       </n-space>
     </div>
     
     <div class="bar-right">
-      <n-space :size="12" align="center" wrap>
+      <n-space :size="12" align="center" class="bar-right-space">
         <n-button-group size="small">
           <n-button @click="handleCopy" title="复制">
             <template #icon>
@@ -111,7 +120,7 @@
               </transition>
             </n-icon>
           </template>
-          {{ expandTitle }}
+          <span class="btn-text">{{ expandTitle }}</span>
         </n-button>
       </n-space>
     </div>
@@ -426,7 +435,7 @@ async function handlePaste() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   background-color: #fff;
   border-bottom: 1px solid #e0e0e0;
@@ -436,6 +445,29 @@ async function handlePaste() {
 .bar-left, .bar-right {
   display: flex;
   align-items: center;
+}
+
+.bar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.bar-left::-webkit-scrollbar {
+  height: 0;
+}
+
+.bar-right {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.bar-left-space :deep(.n-space),
+.bar-right-space :deep(.n-space) {
+  flex-wrap: nowrap;
 }
 
 .control-item {
@@ -450,27 +482,17 @@ async function handlePaste() {
 }
 
 .action-btn {
-  min-width: 80px; /* Consistent width for main buttons */
+  min-width: 32px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 960px) {
   .function-bar {
     padding: 4px 10px;
     gap: 6px;
-    justify-content: flex-start;
   }
 
-  .bar-left,
-  .bar-right {
-    flex: 1 1 100%;
-  }
-
-  .bar-right {
-    justify-content: flex-start;
-  }
-
-  .action-btn {
-    min-width: 72px;
+  .btn-text {
+    display: none;
   }
 }
 
