@@ -1,8 +1,27 @@
 use crate::core::formatter::pipeline::{process_text, FormatOptions, FormatResult};
 use crate::core::json_tools::{self, JsonMode, JsonOptions};
 use std::fs;
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, WebviewWindow};
 use tauri::Emitter;
+
+static PENDING_OPEN_PATHS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+
+pub fn set_pending_open_paths(paths: Vec<String>) {
+    let storage = PENDING_OPEN_PATHS.get_or_init(|| Mutex::new(Vec::new()));
+    if let Ok(mut guard) = storage.lock() {
+        *guard = paths;
+    }
+}
+
+#[tauri::command]
+pub fn take_pending_open_paths() -> Vec<String> {
+    let storage = PENDING_OPEN_PATHS.get_or_init(|| Mutex::new(Vec::new()));
+    if let Ok(mut guard) = storage.lock() {
+        return std::mem::take(&mut *guard);
+    }
+    Vec::new()
+}
 
 #[tauri::command]
 pub fn open_devtools(window: WebviewWindow) {

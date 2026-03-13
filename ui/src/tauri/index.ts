@@ -128,6 +128,10 @@ export const commands = {
 
   watchFile: async (path: string, cb: (event: any) => void) => {
     return await fsWatch(path, cb);
+  },
+
+  takePendingOpenPaths: async () => {
+    return await invokeTauri<string[]>('take_pending_open_paths');
   }
 };
 
@@ -145,5 +149,8 @@ export const events = {
     listenTauri('tauri://drag-enter', (event) => callback(event.payload as any)),
 
   onFileDropCancelled: (callback: () => void) => 
-    listenTauri('tauri://drag-leave', callback)
+    listenTauri('tauri://drag-leave', callback),
+
+  onOpenPaths: (callback: (paths: string[]) => void) =>
+    listenTauri('open-paths', (event) => callback((event as any).payload as any))
 };

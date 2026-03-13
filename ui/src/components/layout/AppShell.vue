@@ -315,10 +315,47 @@ watch(
 let unlistenDrop: (() => void) | undefined;
 let unlistenHover: (() => void) | undefined;
 let unlistenCancel: (() => void) | undefined;
+let unlistenOpenPaths: (() => void) | undefined;
+
+async function openPaths(paths: string[]) {
+  const normalized = Array.isArray(paths) ? paths.filter(Boolean) : [];
+  if (normalized.length === 0) return;
+
+  let lastPath = '';
+  for (const path of normalized) {
+    const name = path.split(/[/\\]/).pop() || path;
+    appStore.ensureTab(path, name);
+    appStore.addRecentFile(path);
+    lastPath = path;
+  }
+
+  if (!lastPath) return;
+  const tab = appStore.openTabs.find(t => t.path === lastPath);
+  if (tab) {
+    appStore.setActive(tab.id);
+  }
+  await configStore.loadFile(lastPath);
+  const analysis = analyzeContent(configStore.rawText);
+  if (analysis.type === 'jsonp') {
+    configStore.updateText(analysis.content);
+    message.info('已自动提取 JSONP 内容');
+  }
+}
 
 onMounted(async () => {
     window.addEventListener('keydown', onGlobalKeydown);
     window.addEventListener('resize', checkResponsive);
+
+    try {
+      const pending = await commands.takePendingOpenPaths();
+      await openPaths(pending);
+    } catch {}
+
+    try {
+      unlistenOpenPaths = await events.onOpenPaths(async (paths) => {
+        await openPaths(paths);
+      });
+    } catch {}
     
     unlistenHover = await events.onFileDropHover(() => {
         isDragging.value = true;
@@ -392,6 +429,7 @@ onUnmounted(() => {
   if (unlistenDrop) unlistenDrop();
   if (unlistenHover) unlistenHover();
   if (unlistenCancel) unlistenCancel();
+  if (unlistenOpenPaths) unlistenOpenPaths();
 });
 </script>
 
