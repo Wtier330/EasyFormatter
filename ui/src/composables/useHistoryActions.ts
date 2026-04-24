@@ -1,8 +1,7 @@
 import { ref, computed } from 'vue';
 import { useHistoryWorkspaceStore } from '../stores/historyWorkspace';
-import { NButton, NIcon, NTag, useMessage, NModal } from 'naive-ui';
-import { TrashOutline, ChevronDown, RefreshOutline, CloseOutline, AlertCircleOutline } from '@vicons/ionicons5';
-import { formatFileSize } from '../utils/format';
+import { useMessage } from 'naive-ui';
+import { formatFileSize, formatTime } from '../utils/format';
 import type { VersionSummary } from '../services/historyService';
 
 export function useHistoryActions() {
@@ -119,7 +118,7 @@ export function useHistoryActions() {
     } catch (e) {
       message.error(`删除失败: ${e}`);
     } finally {
-      showDelete.value = false;
+      showDeleteConfirm.value = false;
       deleteCandidateIds.value = [];
       selectedDeleteIds.value = [];
       isDeleteMode.value = false;

@@ -1,13 +1,6 @@
-import { onMounted } from 'vue';
-import { useMessage } from 'naive-ui';
-import { useAppStore } from '../stores/app';
-import { useConfigStore } from '../stores/config';
 import { useFileDrop } from './useFileDrop';
 
 export function useOpenPaths() {
-  const message = useMessage();
-  const appStore = useAppStore();
-  const configStore = useConfigStore();
   const { openPaths } = useFileDrop();
 
   async function setupOpenPaths() {

@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue';
+import type { Ref } from 'vue';
 import { formatFileSize, formatTimeAgo } from '../utils/format';
 
 export interface FileInfo {

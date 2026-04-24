@@ -1,6 +1,4 @@
-import { computed } from 'vue';
 import { useConfigStore } from '../stores/config';
-import { readClipboardWithFallback } from '../utils/clipboard-handlers';
 
 export function useTransform() {
   const configStore = useConfigStore();

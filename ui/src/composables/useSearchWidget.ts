@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import { debounce } from '../utils/debounce';
+import type { Ref } from 'vue';
 import { useSearchHistory } from './useSearchHistory';
 
 export function useSearchWidget(
@@ -15,7 +15,7 @@ export function useSearchWidget(
   const matchWholeWord = ref(false);
   const useRegex = ref(false);
 
-  const { history, historyOptions, addToHistory, loadLastSearch, persistLastSearch, debouncedPersist } = useSearchHistory();
+  const { historyOptions, addToHistory, loadLastSearch, persistLastSearch, debouncedPersist } = useSearchHistory();
 
   const matchesCountStr = computed(() => {
     if (props.matchesCount.value === 0) return '无结果';
@@ -24,10 +24,6 @@ export function useSearchWidget(
   });
 
   const hasMatches = computed(() => props.matchesCount.value > 0);
-
-  const debouncedFind = debounce((query: string, options: { regex: boolean, case: boolean, word: boolean }) => {
-    emit('find', query, options);
-  }, 200);
 
   function toggleCase() {
     matchCase.value = !matchCase.value;

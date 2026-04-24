@@ -1,4 +1,3 @@
-import { ref, watch } from 'vue';
 import { useSidebarLayoutStore } from '../stores/sidebarLayout';
 
 const WINDOW_BREAKPOINT = 1200;

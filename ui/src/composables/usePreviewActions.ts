@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue';
 import { useNotification } from 'naive-ui';
 import { useConfigStore } from '../stores/config';
-import { isTauriRuntime } from '../tauri';
 
 export function usePreviewActions() {
   const configStore = useConfigStore();

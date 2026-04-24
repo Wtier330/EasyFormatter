@@ -175,12 +175,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useHistoryWorkspaceStore } from '../../stores/historyWorkspace';
 import { useSidebarLayoutStore } from '../../stores/sidebarLayout';
 import { NButton, NIcon, NTooltip, NTag, NModal, NCheckbox } from 'naive-ui';
 import { RefreshOutline, AlertCircleOutline, ChevronDown, TrashOutline, CloseOutline } from '@vicons/ionicons5';
-import type { VersionSummary } from '../../services/historyService';
 import { useHistoryDeleteMode } from '../../composables/useHistoryDeleteMode';
 import { formatFileSize } from '../../utils/format';
 

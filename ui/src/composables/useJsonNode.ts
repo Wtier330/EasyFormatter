@@ -56,7 +56,7 @@ export function useJsonNode(props: {
     let str = props.data;
 
     str = str
-      .replace(/\/g, '\')
+      .replace(/\\/g, '\\')
       .replace(/\n/g, '\n')
       .replace(/\r/g, '\r')
       .replace(/\t/g, '\t')
@@ -74,7 +74,7 @@ export function useJsonNode(props: {
   const escapedFullString = computed(() => {
     if (typeof props.data !== 'string') return String(props.data);
     return props.data
-      .replace(/\/g, '\')
+      .replace(/\\/g, '\\')
       .replace(/\n/g, '\n')
       .replace(/\r/g, '\r')
       .replace(/\t/g, '\t')
@@ -85,7 +85,7 @@ export function useJsonNode(props: {
   const editing = ref(false);
   const editingValue = ref('');
 
-  function startEdit(onUpdate: (val: any) => void) {
+  function startEdit(_onUpdate: (val: any) => void) {
     if (isExpandable.value) return;
 
     if (valueType.value === 'string') {

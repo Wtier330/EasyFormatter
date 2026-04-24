@@ -1,5 +1,4 @@
 import { ref } from 'vue';
-import type { Ref } from 'vue';
 import { useSidebarLayoutStore } from '../stores/sidebarLayout';
 
 export function useDrawerResize() {

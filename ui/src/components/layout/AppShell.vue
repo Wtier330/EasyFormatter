@@ -132,7 +132,6 @@ import { useLayoutResponsive } from '../../composables/useLayoutResponsive';
 import { usePreviewResize } from '../../composables/usePreviewResize';
 import { useDrawerResize } from '../../composables/useDrawerResize';
 import { useGlobalKeydown } from '../../composables/useGlobalKeydown';
-import { useOpenPaths } from '../../composables/useOpenPaths';
 import { analyzeContent } from '../../utils/contentAnalysis';
 
 // Tauri API
@@ -152,7 +151,7 @@ const { handleNew } = useKeyboardShortcuts();
 const { isDragging, setupFileDrop, cleanupFileDrop } = useFileDrop();
 const { setupResponsive: setupLayoutResponsive, cleanupResponsive: cleanupLayoutResponsive } = useLayoutResponsive();
 const { beginResizeDrawer, cleanupDrawerResize } = useDrawerResize();
-const { onGlobalKeydown, setupGlobalKeydown, cleanupGlobalKeydown } = useGlobalKeydown();
+const { setupGlobalKeydown, cleanupGlobalKeydown } = useGlobalKeydown();
 
 // Layout Refs
 const mainArea = ref<HTMLElement | null>(null);

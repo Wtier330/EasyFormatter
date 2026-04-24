@@ -208,7 +208,7 @@ export const useAppStore = defineStore('app', () => {
     if (idx === -1) return;
 
     openTabs.value.splice(idx, 1);
-    
+
     // If closed tab was active, switch to neighbor or empty
     if (activeTabId.value === id) {
       if (openTabs.value.length > 0) {
@@ -220,6 +220,31 @@ export const useAppStore = defineStore('app', () => {
         activeTabId.value = '';
       }
     }
+  }
+
+  function closeTab(id: string) {
+    removeTab(id);
+  }
+
+  function closeOtherTabs(excludeId: string) {
+    const excludeTab = openTabs.value.find(t => t.id === excludeId);
+    if (!excludeTab) return;
+    openTabs.value = [excludeTab];
+    activeTabId.value = excludeId;
+  }
+
+  function closeLeftTabs(excludeId: string) {
+    const idx = openTabs.value.findIndex(t => t.id === excludeId);
+    if (idx === -1) return;
+    openTabs.value = openTabs.value.slice(idx);
+    activeTabId.value = excludeId;
+  }
+
+  function closeRightTabs(excludeId: string) {
+    const idx = openTabs.value.findIndex(t => t.id === excludeId);
+    if (idx === -1) return;
+    openTabs.value = openTabs.value.slice(0, idx + 1);
+    activeTabId.value = excludeId;
   }
 
   async function syncFilesStatus() {
@@ -288,6 +313,10 @@ export const useAppStore = defineStore('app', () => {
     updateTabDirtyByPath,
     updateTabDirtyById,
     removeTab,
+    closeTab,
+    closeOtherTabs,
+    closeLeftTabs,
+    closeRightTabs,
     syncFilesStatus
   };
 });

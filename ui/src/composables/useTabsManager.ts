@@ -1,11 +1,9 @@
 import { ref, computed, nextTick } from 'vue';
+import type { Ref } from 'vue';
 import { useAppStore } from '../stores/app';
-import { useConfigStore } from '../stores/config';
-import { commands } from '../tauri';
 
 export function useTabsManager(scrollEl: Ref<HTMLElement | null>) {
   const appStore = useAppStore();
-  const configStore = useConfigStore();
 
   const menuX = ref(0);
   const menuY = ref(0);
@@ -15,7 +13,6 @@ export function useTabsManager(scrollEl: Ref<HTMLElement | null>) {
   const menuOptions = computed(() => {
     if (!activeTabForMenu.value) return [];
 
-    const tab = activeTabForMenu.value;
     return [
       {
         label: '关闭',

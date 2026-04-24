@@ -143,11 +143,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, inject, onBeforeUnmount, nextTick } from 'vue';
+import { computed, ref, watch, inject, onBeforeUnmount } from 'vue';
 import { copyToClipboard } from '../../utils/path';
 import { useConfigStore } from '../../stores/config';
-import { useAppStore } from '../../stores/app';
-import { parsePath, setByPath, formatJson } from '../../utils/json';
 import { NInput } from 'naive-ui';
 import { useNodeEdit } from '../../composables/useNodeEdit';
 import { useNodeTooltip } from '../../composables/useNodeTooltip';
@@ -167,7 +165,6 @@ const props = defineProps<{
 }>();
 
 const configStore = useConfigStore();
-const appStore = useAppStore();
 
 const treeState = inject<{
   expandedPaths: any,

@@ -1,7 +1,5 @@
 import { ref, computed } from 'vue';
 import { useHistoryWorkspaceStore } from '../stores/historyWorkspace';
-import { formatFileSize } from '../utils/format';
-import type { VersionSummary } from '../services/historyService';
 
 export function useHistoryFilters() {
   const store = useHistoryWorkspaceStore();
