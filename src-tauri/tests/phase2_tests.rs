@@ -1,5 +1,5 @@
 use std::env;
-use easyformatter_lib::history::repo::{SqliteHistoryRepo, HistoryRepo};
+use easyformatter_lib::history::{SqliteHistoryRepo, HistoryRepoTrait};
 use easyformatter_lib::history::commands;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::atomic::{AtomicU64, Ordering};

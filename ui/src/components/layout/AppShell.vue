@@ -127,8 +127,17 @@ import { panelRegistry } from '../../layout/panelRegistry';
 // Composables
 import { useGlobalPaste } from '../../composables/useGlobalPaste';
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts';
-import { events, commands } from '../../tauri';
+import { useFileDrop } from '../../composables/useFileDrop';
+import { useLayoutResponsive } from '../../composables/useLayoutResponsive';
+import { usePreviewResize } from '../../composables/usePreviewResize';
+import { useDrawerResize } from '../../composables/useDrawerResize';
+import { useGlobalKeydown } from '../../composables/useGlobalKeydown';
+import { useOpenPaths } from '../../composables/useOpenPaths';
 import { analyzeContent } from '../../utils/contentAnalysis';
+
+// Tauri API
+import * as tauri from '../../tauri';
+const { commands, events } = tauri;
 
 const appStore = useAppStore();
 const configStore = useConfigStore();
@@ -139,6 +148,12 @@ const message = useMessage();
 useGlobalPaste();
 const { handleNew } = useKeyboardShortcuts();
 
+// Use composables
+const { isDragging, setupFileDrop, cleanupFileDrop } = useFileDrop();
+const { setupResponsive: setupLayoutResponsive, cleanupResponsive: cleanupLayoutResponsive } = useLayoutResponsive();
+const { beginResizeDrawer, cleanupDrawerResize } = useDrawerResize();
+const { onGlobalKeydown, setupGlobalKeydown, cleanupGlobalKeydown } = useGlobalKeydown();
+
 // Layout Refs
 const mainArea = ref<HTMLElement | null>(null);
 const contentWrapper = ref<HTMLElement | null>(null);
@@ -146,9 +161,9 @@ const jsonEditorRef = ref<any>(null);
 const previewRef = ref<any>(null);
 
 const isResizingPreview = ref(false);
-const isDragging = ref(false);
-const isResizingDrawer = ref(false);
-let drawerResizeCleanup: (() => void) | null = null;
+
+// Setup responsive
+setupLayoutResponsive();
 
 // Guarded history mode check to avoid store initialization timing issues
 const isHistoryMode = computed(() => {
@@ -169,20 +184,12 @@ const hasTabs = computed(() => {
   }
 });
 
-// Drawer guards
+// Drawer helpers
 const isDrawerVisible = computed(() => {
   try {
     return !!(layoutStore as any)?.drawerVisible;
   } catch {
     return false;
-  }
-});
-const drawerWidthPx = computed(() => {
-  try {
-    const w = (layoutStore as any)?.drawerWidth ?? 0;
-    return `${w}px`;
-  } catch {
-    return '0px';
   }
 });
 
@@ -199,6 +206,8 @@ const currentDrawerComponent = computed(() => {
       return null;
     }
 });
+
+const drawerWidthPx = computed(() => `${layoutStore.drawerWidth}px`);
 
 const computedHistoryLanguage = computed(() => {
     const path = historyWorkspaceStore.activeFile?.logical_path || '';
@@ -223,78 +232,11 @@ function checkResponsive() {
   }
 }
 
-// Preview Resize Logic (Preserved)
-function onResizePreview(delta: number) {
-  const el = contentWrapper.value;
-  if (!el) return;
-
-  const W = el.clientWidth;
-  if (W <= 0) return;
-
-  const cur = W * appStore.previewRatio;
-  let next = cur - delta;
-
-  const MIN_PANEL = 200;
-  const minByRatio = W * 0.2;
-  const maxByRatio = W * 0.8;
-
-  const minPreview = Math.max(MIN_PANEL, minByRatio);
-  const maxPreview = Math.min(W - MIN_PANEL, maxByRatio);
-
-  if (maxPreview <= minPreview) {
-    next = Math.max(MIN_PANEL, Math.min(cur, W - MIN_PANEL));
-  } else {
-    next = Math.max(minPreview, Math.min(next, maxPreview));
-  }
-
-  appStore.previewRatio = next / W;
-}
+// Preview Resize
+const { onResizePreview } = usePreviewResize(contentWrapper);
 
 function closeDrawer() {
   layoutStore.closeRightDrawer();
-}
-
-function beginResizeDrawer(e: MouseEvent) {
-  if (isResizingDrawer.value) return;
-  isResizingDrawer.value = true;
-
-  const startX = e.clientX;
-  const startWidth = (layoutStore as any)?.drawerWidth ?? 360;
-
-  const onMove = (ev: MouseEvent) => {
-    const dx = startX - ev.clientX;
-    const raw = startWidth + dx;
-    const min = 320;
-    const max = 420;
-    const next = Math.max(min, Math.min(raw, max));
-    (layoutStore as any).drawerWidth = next;
-  };
-
-  const onUp = () => {
-    isResizingDrawer.value = false;
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-    drawerResizeCleanup = null;
-  };
-
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
-  drawerResizeCleanup = () => {
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-  };
-}
-
-function onGlobalKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Escape') return;
-
-  if (historyWorkspaceStore.inspectMode) {
-    (historyWorkspaceStore as any).closeCompare?.();
-    return;
-  }
-  if (isDrawerVisible.value) {
-    closeDrawer();
-  }
 }
 
 let raf = 0;
@@ -312,9 +254,6 @@ watch(
 );
 
 // Drag & Drop (Preserved)
-let unlistenDrop: (() => void) | undefined;
-let unlistenHover: (() => void) | undefined;
-let unlistenCancel: (() => void) | undefined;
 let unlistenOpenPaths: (() => void) | undefined;
 
 async function openPaths(paths: string[]) {
@@ -343,7 +282,8 @@ async function openPaths(paths: string[]) {
 }
 
 onMounted(async () => {
-    window.addEventListener('keydown', onGlobalKeydown);
+    setupGlobalKeydown();
+    setupFileDrop();
     window.addEventListener('resize', checkResponsive);
 
     try {
@@ -356,79 +296,15 @@ onMounted(async () => {
         await openPaths(paths);
       });
     } catch {}
-    
-    unlistenHover = await events.onFileDropHover(() => {
-        isDragging.value = true;
-    });
-
-    unlistenCancel = await events.onFileDropCancelled(() => {
-        isDragging.value = false;
-    });
-
-    unlistenDrop = await events.onFileDrop(async (payload) => {
-        isDragging.value = false;
-        const paths = Array.isArray(payload) ? payload : (payload as any).paths || [];
-        if (!paths || paths.length === 0) return;
-
-        let addedCount = 0;
-        let lastSuccessPath = '';
-
-        for (const path of paths) {
-            try {
-                const stats = await commands.stat(path);
-                if (stats.size > 10 * 1024 * 1024) {
-                    message.warning(`文件 ${path} 较大...`);
-                }
-
-                let content = '';
-                try {
-                    content = await commands.readText(path);
-                } catch (readErr) {
-                    // (Simplified Error Handling from previous version)
-                    message.error(`无法读取文件 ${path}: ${readErr}`);
-                    continue;
-                }
-
-                analyzeContent(content);
-                // @ts-ignore
-                const mtime = stats.mtime ? new Date(stats.mtime).getTime() : Date.now();
-                appStore.addRecentFile(path, stats.size, mtime);
-                addedCount++;
-                lastSuccessPath = path;
-                const name = path.split(/[/\\]/).pop() || path;
-                appStore.ensureTab(path, name);
-            } catch (e) {
-                console.error(e);
-            }
-        }
-        
-        if (addedCount > 0) {
-            message.success(`已导入 ${addedCount} 个文件`);
-            if (lastSuccessPath) {
-                 const tab = appStore.openTabs.find(t => t.path === lastSuccessPath);
-                 if (tab) {
-                     appStore.setActive(tab.id);
-                     await configStore.loadFile(lastSuccessPath);
-                     const currentText = configStore.rawText;
-                     const analysis = analyzeContent(currentText);
-                     if (analysis.type === 'jsonp') {
-                         configStore.updateText(analysis.content);
-                         message.info('已自动提取 JSONP 内容');
-                     }
-                 }
-            }
-        }
-    });
 });
 
 onUnmounted(() => {
   cancelAnimationFrame(raf);
-  window.removeEventListener('keydown', onGlobalKeydown);
   window.removeEventListener('resize', checkResponsive);
-  if (drawerResizeCleanup) drawerResizeCleanup();
-  if (unlistenDrop) unlistenDrop();
-  if (unlistenHover) unlistenHover();
-  if (unlistenCancel) unlistenCancel();
+  cleanupDrawerResize();
+  cleanupFileDrop();
+  cleanupGlobalKeydown();
+  cleanupLayoutResponsive();
   if (unlistenOpenPaths) unlistenOpenPaths();
 });
 </script>

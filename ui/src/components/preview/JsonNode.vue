@@ -149,6 +149,8 @@ import { useConfigStore } from '../../stores/config';
 import { useAppStore } from '../../stores/app';
 import { parsePath, setByPath, formatJson } from '../../utils/json';
 import { NInput } from 'naive-ui';
+import { useNodeEdit } from '../../composables/useNodeEdit';
+import { useNodeTooltip } from '../../composables/useNodeTooltip';
 
 // Circular dependency solution for recursive components
 defineOptions({
@@ -217,7 +219,7 @@ const objSummary = computed(() => {
 const truncatedString = computed(() => {
   if (typeof props.data !== 'string') return '';
   let str = props.data;
-  
+
   // Escape special characters for display
   str = str
     .replace(/\\/g, '\\\\')
@@ -225,7 +227,7 @@ const truncatedString = computed(() => {
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')
     .replace(/"/g, '\\"');
-    
+
   return str.length > 40 ? str.substring(0, 40) + '...' : str;
 });
 
@@ -246,32 +248,35 @@ const escapedFullString = computed(() => {
     .replace(/"/g, '\\"');
 });
 
-// Tooltip State
-const showTooltip = ref(false);
-const tooltipStyle = ref({ top: '0px', left: '0px' });
-let hoverTimer: any = null;
-let leaveTimer: any = null;
+// Use composables
+const {
+  editing,
+  editingValue,
+  inputRef,
+  startEdit: nodeStartEdit,
+  cancelEdit: nodeCancelEdit,
+  commitEdit: nodeCommitEdit
+} = useNodeEdit();
+
+const {
+  showTooltip,
+  tooltipStyle,
+  handleMouseEnter: nodeHandleMouseEnter,
+  handleMouseMove: nodeHandleMouseMove,
+  handleMouseLeave: nodeHandleMouseLeave,
+  cleanup: tooltipCleanup
+} = useNodeTooltip();
 
 function handleMouseEnter(e: MouseEvent) {
-  if (editing.value) return; 
-  clearTimeout(leaveTimer);
-  hoverTimer = setTimeout(() => {
-    updateTooltipPosition(e);
-    showTooltip.value = true;
-  }, 1000);
+  nodeHandleMouseEnter(e, editing.value, updateTooltipPosition);
 }
 
 function handleMouseMove(e: MouseEvent) {
-  if (!showTooltip.value && !hoverTimer) return;
-  updateTooltipPosition(e);
+  nodeHandleMouseMove(e, updateTooltipPosition);
 }
 
 function handleMouseLeave() {
-  clearTimeout(hoverTimer);
-  hoverTimer = null;
-  leaveTimer = setTimeout(() => {
-    showTooltip.value = false;
-  }, 300);
+  nodeHandleMouseLeave();
 }
 
 function updateTooltipPosition(e: MouseEvent) {
@@ -279,7 +284,6 @@ function updateTooltipPosition(e: MouseEvent) {
   const y = e.clientY + 15;
   const winWidth = window.innerWidth;
   // Prevent tooltip from going off-screen to the right
-  // Assuming max width around 500px or so, just a rough check
   const finalX = x + 300 > winWidth ? winWidth - 320 : x;
   tooltipStyle.value = {
     top: `${y}px`,
@@ -288,8 +292,7 @@ function updateTooltipPosition(e: MouseEvent) {
 }
 
 onBeforeUnmount(() => {
-  clearTimeout(hoverTimer);
-  clearTimeout(leaveTimer);
+  tooltipCleanup();
 });
 
 // Watch isOpen to update persistent state
@@ -314,86 +317,18 @@ function toggle() {
   isOpen.value = !isOpen.value;
 }
 
-const editing = ref(false);
-const editingValue = ref('');
-const inputRef = ref<InstanceType<typeof NInput> | null>(null);
-
 function startEdit() {
   if (isExpandable.value) return;
-  
-  if (valueType.value === 'string') {
-    // Show escaped version for editing so user sees \n as characters
-    editingValue.value = escapedFullString.value;
-  } else {
-    editingValue.value = String(props.data);
-  }
-  editing.value = true;
+  nodeStartEdit(valueType.value, isExpandable.value, escapedFullString.value, props.data);
   showTooltip.value = false;
-  clearTimeout(hoverTimer);
-  
-  // Auto focus
-  nextTick(() => {
-    inputRef.value?.focus();
-  });
 }
 
 function cancelEdit() {
-  editing.value = false;
+  nodeCancelEdit();
 }
 
 function commitEdit() {
-  if (!editing.value) return;
-  let newVal: any = editingValue.value;
-  try {
-    if (valueType.value === 'string') {
-      // User sees escaped string (e.g. "a\nb"), we need to unescape it back to raw string.
-      // We construct a valid JSON string literal and parse it.
-      // 1. Escape quotes because we wrap in quotes.
-      // 2. editingValue already contains user's desired escape sequences (like \n).
-      //    But wait, if user types \n (chars), they mean newline.
-      //    If user types \\n (chars), they mean backslash-n.
-      //    The JSON.parse approach:
-      //    If user input is: foo\nbar (chars)
-      //    We want result: foo (newline) bar.
-      //    JSON source: "foo\nbar".
-      //    So we can just wrap in quotes? 
-      //    NO. If user input has literal newline (from Enter key), we must escape it to \n.
-      //    And we must escape literal " to \".
-      
-      const jsonSource = editingValue.value
-        .replace(/"/g, '\\"')
-        // We do NOT replace \n with \\n here if the user intended to type \n as characters.
-        // Wait. If user types chars \ and n. They want newline.
-        // If I use JSON.parse, "foo\nbar" becomes newline. Correct.
-        // But what if user typed a LITERAL newline (e.g. pasted it)?
-        // "foo
-        // bar"
-        // JSON.parse("foo
-        // bar") is invalid.
-        // So literal newlines MUST be escaped to \n.
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-        
-      newVal = JSON.parse(`"${jsonSource}"`);
-    } else {
-      // try parse JSON literal
-      newVal = JSON.parse(editingValue.value);
-    }
-  } catch {
-    // fallback to string
-    newVal = editingValue.value;
-  }
-  try {
-    const tokens = parsePath(props.path);
-    const root = configStore.lastValidConfig ?? {};
-    const next = setByPath(root, tokens, newVal);
-    const text = formatJson(next, appStore.indentSize);
-    configStore.updateText(text);
-    editing.value = false;
-  } catch (e) {
-    editing.value = false;
-  }
+  nodeCommitEdit(props.path, valueType.value);
 }
 
 function getNextPath(key: string | number) {
